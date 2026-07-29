@@ -1,0 +1,50 @@
+version: 2
+
+updates:
+  # Third-party actions are pinned to commit SHAs for supply-chain safety, which means nothing
+  # updates them unless something is watching. Dependabot understands pinned SHAs and rewrites
+  # both the SHA and its trailing version comment.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '09:00'
+      timezone: Australia/Sydney
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: ci
+    groups:
+      actions:
+        patterns: ['*']
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '09:00'
+      timezone: Australia/Sydney
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: deps
+      prefix-development: chore
+    # One PR per patch/minor bump across ~20 dev dependencies is noise nobody reads. Grouping
+    # keeps each week to a couple of PRs that CI can verify as a unit, while majors stay
+    # separate because they are the ones that actually need reading.
+    groups:
+      dev-dependencies:
+        dependency-type: development
+        update-types: [minor, patch]
+      production-dependencies:
+        dependency-type: production
+        update-types: [minor, patch]
+    ignore:
+      # Homebridge v2 is the supported runtime; a v3 bump is a deliberate porting decision,
+      # not something to merge from a dependency PR.
+      - dependency-name: homebridge
+        update-types: [version-update:semver-major]
+      # TypeScript majors are held back by typescript-eslint's peer range, so an automatic
+      # major here produces a PR that cannot pass CI.
+      - dependency-name: typescript
+        update-types: [version-update:semver-major]
