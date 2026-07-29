@@ -1,4 +1,4 @@
-# homebridge-actronair-neo
+# Homebridge ActronAir Neo
 
 [![npm](https://img.shields.io/npm/v/homebridge-actronair-neo/latest?label=latest)](https://www.npmjs.com/package/homebridge-actronair-neo)
 [![GitHub release](https://img.shields.io/github/release/ruaan-deysel/homebridge-actronair-neo.svg)](https://github.com/ruaan-deysel/homebridge-actronair-neo/releases)
