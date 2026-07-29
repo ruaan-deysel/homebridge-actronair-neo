@@ -68,7 +68,10 @@ export function setPath(tree: object, path: string, value: unknown): boolean {
 
   if (node === null || typeof node !== 'object')
     return false
-  if (typeof last === 'string' && UNSAFE_KEYS.has(last))
+  // Written as explicit literal comparisons rather than reusing UNSAFE_KEYS: this is the
+  // sanitizer guarding the write below, and a Set lookup is opaque both to a reader skimming
+  // for the guard and to static analysis checking this sink is protected.
+  if (last === '__proto__' || last === 'constructor' || last === 'prototype')
     return false
   if (Array.isArray(node) && typeof last === 'number' && last >= node.length)
     return false

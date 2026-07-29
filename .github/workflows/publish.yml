@@ -12,6 +12,12 @@ on:
     branches: [main]
     tags: ['v*']
 
+# Least privilege by default; the publish job below widens this for itself, and only for
+# itself. Without a default block every job inherits the repository-wide scopes, which is how
+# a test job ends up holding write access it has no use for.
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest

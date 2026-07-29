@@ -4,6 +4,12 @@ on:
   pull_request:
     branches: [main]
 
+# Least privilege: this workflow only reads the code it tests. Without an explicit block the
+# job inherits whatever the repository default is, which can include write scopes it never
+# needs — and it runs against pull requests, including ones from forks.
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
