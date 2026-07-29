@@ -50,10 +50,24 @@ function computeFanBands(speeds: FanMode[]): FanBand[] {
   return bands
 }
 
+/**
+ * Keep a setpoint inside the range HAP was told about. A device that reports no setpoint (or
+ * reports one outside its own limits) must not produce a value HAP rejects — the alternative
+ * is an "illegal value" warning on every update and a characteristic HomeKit won't display.
+ */
+function clampToBounds(value: number | undefined, bounds: { min: number, max: number }): number {
+  if (value === undefined || !Number.isFinite(value))
+    return bounds.min
+  return Math.min(bounds.max, Math.max(bounds.min, value))
+}
+
 export class MasterAccessory {
   private readonly hvacService: Service
   private readonly humidityService: Service
   private readonly fanBands: FanBand[]
+  /** Effective setpoint range per mode, resolved from the device once at construction. */
+  private heatBounds!: { min: number, max: number }
+  private coolBounds!: { min: number, max: number }
   /**
    * Last known-good readings. The cloud reports a 3000 sentinel (and other implausible
    * values) for a sensor that isn't answering; serving that raw would push a value HAP caps
@@ -101,25 +115,33 @@ export class MasterAccessory {
     this.hvacService.getCharacteristic(this.platform.Characteristic.CurrentTemperature)
       .onGet(this.getCurrentTemperature.bind(this))
 
-    // Device-reported limits win over the configured fallback — see resolveSetpointBounds().
+    // Device-reported limits win over the built-in fallback — see resolveSetpointBounds().
     const heatBounds = resolveSetpointBounds(this.platform.state, 'heat')
     const coolBounds = resolveSetpointBounds(this.platform.state, 'cool')
+    this.heatBounds = { min: Math.max(10, heatBounds.min), max: heatBounds.max }
+    this.coolBounds = coolBounds
 
+    // Both characteristics start at a HAP default below these minimums (0 for heating, 10 for
+    // cooling), so tightening the range without seeding a valid value makes HAP reject the
+    // stored one and warn on every startup. The getters clamp for the same reason: a device
+    // that doesn't report a setpoint must not fall back to a value outside its own limits.
     this.hvacService.getCharacteristic(this.platform.Characteristic.HeatingThresholdTemperature)
       .setProps({
-        minValue: Math.max(10, heatBounds.min),
-        maxValue: heatBounds.max,
+        minValue: this.heatBounds.min,
+        maxValue: this.heatBounds.max,
         minStep: 0.5,
       })
+      .updateValue(this.getHeatingThresholdTemperature())
       .onGet(this.getHeatingThresholdTemperature.bind(this))
       .onSet(this.setHeatingThresholdTemperature.bind(this))
 
     this.hvacService.getCharacteristic(this.platform.Characteristic.CoolingThresholdTemperature)
       .setProps({
-        minValue: coolBounds.min,
-        maxValue: coolBounds.max,
+        minValue: this.coolBounds.min,
+        maxValue: this.coolBounds.max,
         minStep: 0.5,
       })
+      .updateValue(this.getCoolingThresholdTemperature())
       .onGet(this.getCoolingThresholdTemperature.bind(this))
       .onSet(this.setCoolingThresholdTemperature.bind(this))
 
@@ -271,7 +293,7 @@ export class MasterAccessory {
   }
 
   getHeatingThresholdTemperature(): CharacteristicValue {
-    return this.platform.state.get<number>(WATCHED.heatSetpoint) ?? 0
+    return clampToBounds(this.platform.state.get<number>(WATCHED.heatSetpoint), this.heatBounds)
   }
 
   async setCoolingThresholdTemperature(value: CharacteristicValue): Promise<void> {
@@ -283,7 +305,7 @@ export class MasterAccessory {
   }
 
   getCoolingThresholdTemperature(): CharacteristicValue {
-    return this.platform.state.get<number>(WATCHED.coolSetpoint) ?? 0
+    return clampToBounds(this.platform.state.get<number>(WATCHED.coolSetpoint), this.coolBounds)
   }
 
   async setFanMode(value: CharacteristicValue): Promise<void> {

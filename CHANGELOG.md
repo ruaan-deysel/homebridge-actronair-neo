@@ -5,6 +5,28 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] - 2026-07-29
+
+### Fixed
+
+- HomeKit no longer logs "supplied illegal value" for the master setpoints or the After Hours
+  duration on every startup. These characteristics begin at a HAP default below the range the
+  plugin sets from the device's own limits, so the stored value was rejected until something
+  wrote a valid one. They are now seeded at startup, and the setpoint getters clamp into the
+  device's range instead of falling back to a value outside it.
+- Zone names are trimmed to what HAP accepts. A name entered in the ActronAir app with a
+  trailing space — invisible there — made HomeKit warn that the accessory "may not be added in
+  the Home App or cause unresponsiveness". Existing accessories are corrected in place, keeping
+  their room, scenes and automations, and every service name is reconciled rather than only the
+  accessory's own.
+
+### Security
+
+- Both workflows declare least-privilege `permissions` instead of inheriting repository-wide
+  scopes, and the path-write helper's prototype-pollution guard is now explicit at the write
+  itself. Behaviour is unchanged; the guard was previously expressed in a form static analysis
+  could not follow.
+
 ## [1.0.0] - 2026-07-29
 
 First release of **homebridge-actronair-neo**.
@@ -96,4 +118,5 @@ First release of **homebridge-actronair-neo**.
   plugin settings page; there is no username or password setting, and nothing to configure by
   hand.
 
+[1.0.1]: https://github.com/ruaan-deysel/homebridge-actronair-neo/releases/tag/v1.0.1
 [1.0.0]: https://github.com/ruaan-deysel/homebridge-actronair-neo/releases/tag/v1.0.0

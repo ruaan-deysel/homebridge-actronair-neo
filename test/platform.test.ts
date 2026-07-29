@@ -4,7 +4,7 @@ import { ZoneAccessory } from '../src/accessories/zone.js'
 import { NeoAuthRevokedError } from '../src/neo/auth.js'
 import { NeoMqtt } from '../src/neo/mqtt.js'
 import { NeoCommand } from '../src/neo/types.js'
-import { ActronAirNeoPlatform } from '../src/platform.js'
+import { ActronAirNeoPlatform, sanitizeAccessoryName } from '../src/platform.js'
 
 vi.mock('../src/accessories/zone.js', () => ({
   ZoneAccessory: vi.fn(),
@@ -707,5 +707,31 @@ describe('actronAirNeoPlatform', () => {
 
     expect(log.debug).toHaveBeenCalledWith('queued command')
     expect(log.info).not.toHaveBeenCalled()
+  })
+})
+
+describe('sanitizeAccessoryName', () => {
+  // HAP warns that a name not starting and ending with a letter or number "may prevent the
+  // accessory from being added in the Home App or cause unresponsiveness". Zone names are
+  // whatever the user typed in the ActronAir app, where a trailing space is invisible.
+  it('trims edge characters HAP rejects', () => {
+    expect(sanitizeAccessoryName('Office 1 ', 'Zone 3')).toBe('Office 1')
+    expect(sanitizeAccessoryName('  Master Bedroom  ', 'Zone 1')).toBe('Master Bedroom')
+  })
+
+  it('leaves a name HAP already accepts untouched, including interior punctuation', () => {
+    expect(sanitizeAccessoryName('Office 1', 'Zone 3')).toBe('Office 1')
+    expect(sanitizeAccessoryName('Kids\' Room', 'Zone 2')).toBe('Kids\' Room')
+    expect(sanitizeAccessoryName('Zone-A', 'Zone 8')).toBe('Zone-A')
+  })
+
+  it('keeps non-ASCII letters, which are valid and common in room names', () => {
+    expect(sanitizeAccessoryName('Café', 'Zone 9')).toBe('Café')
+  })
+
+  it('falls back when nothing usable survives, rather than naming an accessory ""', () => {
+    expect(sanitizeAccessoryName('...', 'Zone 5')).toBe('Zone 5')
+    expect(sanitizeAccessoryName('', 'Zone 6')).toBe('Zone 6')
+    expect(sanitizeAccessoryName('   ', 'Zone 7')).toBe('Zone 7')
   })
 })

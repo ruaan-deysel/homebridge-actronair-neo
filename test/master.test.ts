@@ -30,6 +30,11 @@ class FakeCharacteristic {
     return this
   }
 
+  updateValue(value: unknown) {
+    this.value = value
+    return this
+  }
+
   async invokeSet(v: unknown) {
     return this.setter?.(v)
   }
@@ -388,5 +393,57 @@ describe('masterAccessory', () => {
       expect(commands.run).toHaveBeenCalled()
       expect(() => master.getFanMode()).not.toThrow()
     })
+  })
+})
+
+describe('setpoint characteristics stay inside the range HAP was told about', () => {
+  // Regression: HeatingThresholdTemperature starts at HAP's default of 0 and Cooling at 10.
+  // Tightening minValue to the device's own floor (16 on the owner's NTW-1000) without
+  // seeding a value made HAP reject the stored one — "supplied illegal value: number 0
+  // exceeded minimum of 16" on every startup.
+  const deviceLimits = { setCool_Min: 16, setCool_Max: 30, setHeat_Min: 16, setHeat_Max: 30 }
+
+  it('seeds a legal value at construction rather than leaving the HAP default in place', () => {
+    const { hvac } = makeHarness({}, { limits: deviceLimits })
+
+    for (const id of [Characteristic.HeatingThresholdTemperature, Characteristic.CoolingThresholdTemperature]) {
+      const c = hvac.getCharacteristic(id)
+      expect(typeof c.value).toBe('number')
+      expect(c.value as number).toBeGreaterThanOrEqual(c.props.minValue as number)
+      expect(c.value as number).toBeLessThanOrEqual(c.props.maxValue as number)
+    }
+  })
+
+  it('clamps into range when the device reports no setpoint at all', () => {
+    const { state, master } = makeHarness({}, { limits: deviceLimits })
+    state.replace({ ...baseTree(), NV_Limits: { UserSetpoint_oC: deviceLimits }, UserAirconSettings: {} } as never)
+
+    // Without clamping these fall back to 0 and 10 — both below the device's 16 floor.
+    expect(master.getHeatingThresholdTemperature()).toBe(16)
+    expect(master.getCoolingThresholdTemperature()).toBe(16)
+  })
+
+  it('clamps a setpoint the device reports outside its own limits', () => {
+    const { state, master } = makeHarness({}, { limits: deviceLimits })
+    state.replace({
+      ...baseTree(),
+      NV_Limits: { UserSetpoint_oC: deviceLimits },
+      UserAirconSettings: { TemperatureSetpoint_Heat_oC: 4, TemperatureSetpoint_Cool_oC: 99 },
+    } as never)
+
+    expect(master.getHeatingThresholdTemperature()).toBe(16)
+    expect(master.getCoolingThresholdTemperature()).toBe(30)
+  })
+
+  it('passes a valid setpoint through untouched', () => {
+    const { state, master } = makeHarness({}, { limits: deviceLimits })
+    state.replace({
+      ...baseTree(),
+      NV_Limits: { UserSetpoint_oC: deviceLimits },
+      UserAirconSettings: { TemperatureSetpoint_Heat_oC: 21, TemperatureSetpoint_Cool_oC: 23.5 },
+    } as never)
+
+    expect(master.getHeatingThresholdTemperature()).toBe(21)
+    expect(master.getCoolingThresholdTemperature()).toBe(23.5)
   })
 })

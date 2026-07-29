@@ -41,6 +41,11 @@ class FakeCharacteristic {
     return this
   }
 
+  updateValue(value: unknown) {
+    this.value = value
+    return this
+  }
+
   async invokeGet() { return this.getHandler?.() }
   async invokeSet(v: unknown) { return this.setHandler?.(v) }
 }

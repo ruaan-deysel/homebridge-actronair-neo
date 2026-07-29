@@ -65,6 +65,10 @@ export class AfterHoursAccessory {
 
     service.getCharacteristic(this.platform.Characteristic.SetDuration)
       .setProps({ minValue: MIN_DURATION_SEC, maxValue: MAX_DURATION_SEC, minStep: STEP_DURATION_SEC })
+      // SetDuration starts at HAP's default of 0, which these props make illegal. HAP checks
+      // the stored value against the new range and warns on every startup unless a valid one
+      // is seeded here; onGet alone is too late, it only runs when something reads.
+      .updateValue(this.getDuration())
       .onGet(() => this.getDuration())
       .onSet(value => this.setDuration(value))
 

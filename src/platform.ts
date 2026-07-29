@@ -28,6 +28,19 @@ const BASE_URL = 'https://nimbus.actronair.com.au'
 /** REST poll cadence used once push updates are healthy — polling never stops, just slows down. */
 const PUSH_HEALTHY_POLL_MS = 5 * 60 * 1000
 
+/**
+ * HAP requires an accessory name to start and end with a letter or number, and warns that a
+ * name breaking that rule may stop the accessory being added in the Home app or leave it
+ * unresponsive. Zone names come from whatever the user typed in the ActronAir app, where a
+ * trailing space is easy to leave behind and invisible afterwards — so trim rather than
+ * pass it through and let HomeKit misbehave. Interior punctuation is left alone; only the
+ * edges matter to HAP.
+ */
+export function sanitizeAccessoryName(name: string, fallback: string): string {
+  const trimmed = name.replace(/^[^\p{L}\p{N}]+/u, '').replace(/[^\p{L}\p{N}]+$/u, '')
+  return trimmed || fallback
+}
+
 /** Consecutive failed polls before the failure is raised from debug to a visible warning. */
 const POLL_FAILURE_WARN_AFTER = 3
 
@@ -204,7 +217,7 @@ export class ActronAirNeoPlatform implements DynamicPlatformPlugin {
             // (lost room placement, scenes, automations). See syncAccessories() for migration
             // of accessories cached under the old `zone-${index}-${title}` scheme.
             id: `zone-${zoneIndex}`,
-            displayName: zone.NV_Title as string,
+            displayName: sanitizeAccessoryName(zone.NV_Title as string, `Zone ${zoneIndex + 1}`),
             kind: 'zone' as const,
             zoneIndex,
           })),
@@ -249,6 +262,13 @@ export class ActronAirNeoPlatform implements DynamicPlatformPlugin {
       const accessory = existing ?? new PlatformAccessoryCtor(device.displayName, uuid)
       accessory.context.device = device
 
+      // A cached accessory keeps the name it was registered under, so a rename in the
+      // ActronAir app — or a name this plugin has since had to sanitise for HAP — would stay
+      // stale forever, and HAP would keep warning about it on every restart.
+      const renamed = existing && accessory.displayName !== device.displayName
+      if (renamed)
+        accessory.displayName = device.displayName
+
       try {
         this.build(device, accessory)
       }
@@ -259,6 +279,24 @@ export class ActronAirNeoPlatform implements DynamicPlatformPlugin {
 
       if (existing) {
         this.log.info(`Restoring accessory from cache: ${accessory.displayName}`)
+        // Each service carries its own cached Name. Accessories set it on the service they own,
+        // but a zone also has temperature/humidity/battery services whose names would keep a
+        // stale value in the Home app. Reconcile every service against displayName rather than
+        // only when displayName itself just changed — once displayName has been corrected on an
+        // earlier run, that condition is false while the service names are still wrong.
+        let staleServiceName = false
+        for (const service of accessory.services) {
+          if (!service.testCharacteristic(this.Characteristic.Name))
+            continue
+          if (service.getCharacteristic(this.Characteristic.Name).value !== accessory.displayName) {
+            service.updateCharacteristic(this.Characteristic.Name, accessory.displayName)
+            staleServiceName = true
+          }
+        }
+        // Persist only on a real change; without the write the cache is rebuilt from the old
+        // value on next shutdown, with it every restart would rewrite the cache for nothing.
+        if (renamed || staleServiceName)
+          this.api.updatePlatformAccessories([accessory])
       }
       else {
         this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory])
