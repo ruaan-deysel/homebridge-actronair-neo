@@ -1,0 +1,9 @@
+{
+  "Endpoint": "203.0.113.10",
+  "Port": "8883",
+  "Protocol": "TLS",
+  "WcMinFwVersion": "2.5.x;3.5.x",
+  "Time": "7/28/2026 1:13:04 AM",
+  "UserId": "00000000-0000-0000-0000-000000000000",
+  "OptOutOfLogging": false
+}

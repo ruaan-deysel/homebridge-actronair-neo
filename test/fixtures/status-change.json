@@ -1,0 +1,8 @@
+{
+  "event": {
+    "type": "status-change-broadcast",
+    "UserAirconSettings.TemperatureSetpoint_Cool_oC": 22.5,
+    "UserAirconSettings.TemperatureSetpoint_Heat_oC": 22.5
+  },
+  "wcFirmware": "2.6.2.5"
+}

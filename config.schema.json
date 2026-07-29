@@ -1,0 +1,70 @@
+{
+  "pluginAlias": "ActronAirNeo",
+  "pluginType": "platform",
+  "singular": true,
+  "customUi": true,
+  "headerDisplay": "Link your ActronAir account using the button above. Your password is never entered into or stored by this plugin.",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "title": "Name",
+        "type": "string",
+        "required": true,
+        "default": "ActronAir Neo"
+      },
+      "refreshToken": {
+        "title": "Refresh Token",
+        "type": "string",
+        "required": false,
+        "description": "Set automatically when you link your account above. Do not edit by hand.",
+        "x-schema-form": {
+          "type": "password"
+        },
+        "condition": {
+          "functionBody": "return false;"
+        }
+      },
+      "deviceSerial": {
+        "title": "System Serial",
+        "type": "string",
+        "required": false,
+        "description": "Only needed if your ActronAir account has more than one system. Set from the dropdown shown after linking, or enter it manually.",
+        "condition": {
+          "functionBody": "return false;"
+        }
+      },
+      "clientId": {
+        "title": "OAuth Client ID",
+        "type": "string",
+        "required": false,
+        "default": "home_assistant",
+        "description": "Advanced. The OAuth2 client id used to authenticate with the ActronAir cloud. 'home_assistant' is currently the only value known to work; leave as-is unless ActronAir issues a plugin-specific client id.",
+        "condition": {
+          "functionBody": "return false;"
+        }
+      },
+      "zonesAsHeaterCoolers": {
+        "title": "Enable zone control",
+        "description": "Create individual zone accessories with their own temperature controls, instead of a simple on/off switch per zone. Requires your system to support per-zone temperature setpoints.",
+        "type": "boolean",
+        "required": false,
+        "default": false
+      },
+      "refreshInterval": {
+        "title": "Refresh Interval (seconds)",
+        "description": "How often the plugin polls the ActronAir cloud for status. Used whenever live push updates are unavailable or stale; once push updates connect, polling backs off to a slower safety-net cadence.",
+        "type": "integer",
+        "required": false,
+        "default": 60
+      },
+      "debug": {
+        "title": "Enable Debug Logging",
+        "description": "Surfaces this plugin's detailed debug logs (command queueing, coalescing, API requests/responses) in the Homebridge log without needing to run all of Homebridge in debug mode. They are written at info level, so only this plugin becomes more verbose.",
+        "type": "boolean",
+        "required": false,
+        "default": false
+      }
+    }
+  }
+}

@@ -1,0 +1,1276 @@
+{
+  "event": {
+    "<NEO000000>": {
+      "Cloud": {
+        "ConnectionState": "Connected",
+        "FailedSentPackets": 0,
+        "ReceivedPackets": 319155,
+        "SentPackets": 464698,
+        "Connection": {
+          "UpTime": {
+            "SinceLastMCUReset_s": 3165267,
+            "CurrentSession_s": 98362
+          },
+          "SessionCount": {
+            "SinceLastMCUReset": 112,
+            "PriorToLastMCUReset": 0
+          },
+          "ErrorCount": {
+            "AbortedSockets": 0,
+            "LoopbackError": 0,
+            "DNSFailures": 0
+          }
+        }
+      },
+      "Modbus": {
+        "LinkPort": "Opened",
+        "Metrics": {
+          "TXPayloads": {
+            "Good": 2072795,
+            "Bad": 168
+          },
+          "RXPayloads": {
+            "Good": 6287777,
+            "Bad": 168
+          },
+          "Error": {
+            "Conflicts": 0,
+            "ComLossEvents": 0
+          }
+        }
+      },
+      "NV_SystemSettings_Local": {
+        "OTA": {
+          "Mode": 2,
+          "CheckInterval": {
+            "Mode1_Period_min": 1440,
+            "Mode2_TimeOfDay": "T02:00:00"
+          },
+          "LastCheck": {
+            "Trigger": "7",
+            "Time": "NA",
+            "Result": "",
+            "Images": [
+              {
+                "ImageName": "neo2-firmware-slot2",
+                "URL": "",
+                "Status": "QUERY_PENDING",
+                "CheckTime": "NA"
+              },
+              {
+                "ImageName": "neo-graphics",
+                "URL": "",
+                "Status": "MODULE_NOT_READY_TO_CHECK_FW_VER",
+                "CheckTime": "NA"
+              },
+              {
+                "ImageName": "neo-secondary-graphics",
+                "URL": "",
+                "Status": "MODULE_NOT_READY_TO_CHECK_FW_VER",
+                "CheckTime": "NA"
+              },
+              {
+                "ImageName": "indoor-inzone3-board",
+                "URL": "",
+                "Status": "MODULE_NOT_READY_TO_CHECK_FW_VER",
+                "CheckTime": "NA"
+              },
+              {
+                "ImageName": "neo-ble",
+                "URL": "",
+                "Status": "MODULE_NOT_READY_TO_CHECK_FW_VER",
+                "CheckTime": "NA"
+              },
+              {
+                "ImageName": "neo-zone-controller",
+                "URL": "",
+                "Status": "MODULE_NOT_READY_TO_CHECK_FW_VER",
+                "CheckTime": "NA"
+              },
+              {
+                "ImageName": "odb-unojr-pic24fj128ga308",
+                "URL": "",
+                "Status": "MODULE_NOT_READY_TO_CHECK_FW_VER",
+                "CheckTime": "NA"
+              },
+              {
+                "ImageName": "neo-wifi",
+                "URL": "",
+                "Status": "MODULE_NOT_READY_TO_CHECK_FW_VER",
+                "CheckTime": "NA"
+              },
+              {
+                "ImageName": "neo4q-firmware",
+                "URL": "",
+                "Status": "MODULE_NOT_READY_TO_CHECK_FW_VER",
+                "CheckTime": "NA"
+              }
+            ]
+          },
+          "NextCheck": {
+            "Time": "NA"
+          },
+          "InstallationStatus": {
+            "TargetDevice": "0",
+            "State": "IDLE",
+            "Progress": 0
+          }
+        }
+      },
+      "SystemState": {
+        "CpuId": "0xDEADBEEFDEADBEEFDEADBEEF",
+        "LastShutdownReason": "Software Trigger",
+        "MCUResetCountSincePOR": {
+          "Total": 0,
+          "Remote": 0
+        },
+        "HardFaultDebug": {
+          "Type": "0",
+          "IncidentCount": 0,
+          "LastIncidentTime": "NA",
+          "CoreRegisterDump": {
+            "R0": "0x00000000",
+            "R1": "0x00000000",
+            "R2": "0x00000000",
+            "R3": "0x00000000",
+            "R12": "0x00000000",
+            "LR": "0x00000000",
+            "PC": "0x00000000",
+            "PSR": "0x00000000"
+          }
+        },
+        "RTOS": {
+          "BlockingTaskMonitor": {
+            "Id": 0,
+            "TimeStamp": "NA",
+            "Parameters": [
+              0
+            ]
+          }
+        },
+        "I2C": [
+          {
+            "Module": 2,
+            "ErrorCount": 15618,
+            "LastDevice": "Time of Flight Sensor",
+            "PinState": {
+              "SCL": 1,
+              "SDA": 1
+            },
+            "Registers": {
+              "ISR": "00000001"
+            },
+            "StatusBits": {
+              "BERR": 0,
+              "ARLO": 0,
+              "OVR": 0,
+              "TIMEOUT": 0
+            }
+          },
+          {
+            "Module": 3,
+            "ErrorCount": 0,
+            "LastDevice": "NA",
+            "PinState": {
+              "SCL": 0,
+              "SDA": 0
+            },
+            "Registers": {
+              "ISR": "00000000"
+            },
+            "StatusBits": {
+              "BERR": 0,
+              "ARLO": 0,
+              "OVR": 0,
+              "TIMEOUT": 0
+            }
+          },
+          {
+            "Module": 4,
+            "ErrorCount": 6410,
+            "LastDevice": "Touch Button",
+            "PinState": {
+              "SCL": 1,
+              "SDA": 1
+            },
+            "Registers": {
+              "ISR": "00000021"
+            },
+            "StatusBits": {
+              "BERR": 0,
+              "ARLO": 0,
+              "OVR": 0,
+              "TIMEOUT": 0
+            }
+          }
+        ],
+        "WCFirmwareVersion": "NEO v2.6.2.5, Jun  9 2026 10:16:47",
+        "WCBootloaderVersion": "1.0.2.0",
+        "ExternalFlash": {
+          "GFXAssets": {
+            "Primary": {
+              "Version": {
+                "Installed": "1.1.0.2",
+                "Required": "1.1.0.2"
+              },
+              "CRC": "OK"
+            },
+            "Secondary": {
+              "Version": {
+                "Installed": "1.0.4.2",
+                "Required": "1.0.4.2"
+              },
+              "CRC": "OK"
+            }
+          },
+          "FirmwareImages": {
+            "STM32_NEO": "",
+            "PIC24_ODU": "No Image",
+            "PIC24_Inzone": "44.40",
+            "PIC24_CMI": "44.40",
+            "NRF52_BLECentral": "No Image",
+            "NRF52_BLEPeripheral1": "No Image",
+            "NRF52_BLEPeripheral2": "No Image",
+            "WINC1500": "No Image"
+          }
+        }
+      },
+      "SystemStatus_Local": {
+        "Uptime_s": 3171991,
+        "WifiStrength_of3": -49,
+        "SensorInputs": {
+          "SHTC1": {
+            "RelativeHumidity_pc": 59.3,
+            "Temperature_oC": 22.3
+          },
+          "RS485": {
+            "AInput_Voltage": 2.1,
+            "BInput_Voltage": 1.6,
+            "Current": 2
+          },
+          "PSU_Voltage": 11.7,
+          "AmbientLight": 753,
+          "Thermistors": {
+            "NearAmbient_oC": 22.4,
+            "WiFi_oC": 29,
+            "MainPCB_oC": 33,
+            "RoomAmbient_oC": 21
+          },
+          "TOF": {
+            "Enabled": true,
+            "Range_mm": -1
+          }
+        },
+        "WiFi": {
+          "FirmwareVersion": "19.6.1",
+          "DriverVersion": "19.3.0",
+          "ModuleMACAddress": "00:00:5E:00:53:01",
+          "ApSSID": "TEST-SSID",
+          "ApBSSID": "00:00:5E:00:53:02",
+          "RFChannel": 6,
+          "ConnectionCount": 1,
+          "DisconnectCount": 0,
+          "DeinitCount": 0,
+          "HardwareErrorCount": 0
+        },
+        "TouchScreen": {
+          "LastTouchTime": "NA",
+          "State": 0,
+          "XCoordinate": 0,
+          "YCoordinate": 0,
+          "I2CErrorCount": 2661,
+          "ControllerModel": "Goodix GT9271"
+        },
+        "TouchButton": {
+          "State": 0,
+          "I2CErrorCount": 2336
+        },
+        "GUI": {
+          "ActiveScreen": "DISPLAY OFF"
+        },
+        "BTLE": {
+          "Central": {
+            "Mode": "NEO2 BTLE",
+            "FirmwareVersion": "1.1.0.0"
+          }
+        }
+      }
+    },
+    "AirconSystem": {
+      "MasterWCModel": "NTW-1000",
+      "MasterSerial": "NEO000000",
+      "MasterWCFirmwareVersion": "2.6.2.5",
+      "IndoorUnit": {
+        "Battery_Backup_Voltage": 3.4,
+        "NV_ModelNumber": "EVA150S",
+        "SerialNumber": "SN000001",
+        "IndoorFW": "3.48",
+        "NV_SupportedFanModes": 3,
+        "NV_AutoFanEnabled": false
+      },
+      "OutdoorUnit": {
+        "Family": "Fixed Speed: Classic",
+        "Capacity_kW": 15,
+        "ModelNumber": "0",
+        "SerialNumber": "SN000002",
+        "SoftwareVersion": "1.05",
+        "CtrlBoardType": "Type 100: UnoJr (PIC24FJ128GA308)"
+      },
+      "WallControllers": [
+        {
+          "Address": "C1",
+          "Type": "NEO",
+          "FirmwareVersion": "NA"
+        },
+        {
+          "Address": "C2",
+          "Type": "NA",
+          "FirmwareVersion": "NA"
+        },
+        {
+          "Address": "C3",
+          "Type": "NA",
+          "FirmwareVersion": "NA"
+        }
+      ],
+      "Sensors": [
+        {
+          "Designator": "C1",
+          "Detected": true,
+          "Enabled": true,
+          "Temperature_oC": 20.9,
+          "TemperatureOffset_oC": 0
+        },
+        {
+          "Designator": "C2",
+          "Detected": false,
+          "Enabled": true,
+          "Temperature_oC": "NA",
+          "TemperatureOffset_oC": 0
+        },
+        {
+          "Designator": "C3",
+          "Detected": false,
+          "Enabled": true,
+          "Temperature_oC": "NA",
+          "TemperatureOffset_oC": 0
+        },
+        {
+          "Designator": "RS1",
+          "Detected": false,
+          "Enabled": true,
+          "Temperature_oC": "NA",
+          "TemperatureOffset_oC": 0
+        },
+        {
+          "Designator": "RS2",
+          "Detected": false,
+          "Enabled": true,
+          "Temperature_oC": "NA",
+          "TemperatureOffset_oC": 0
+        },
+        {
+          "Designator": "RS3",
+          "Detected": false,
+          "Enabled": true,
+          "Temperature_oC": "NA",
+          "TemperatureOffset_oC": 0
+        }
+      ],
+      "Peripherals": [
+        {
+          "LogicalAddress": 1,
+          "DeviceType": "NEO Zone Sensor",
+          "SerialNumber": "SN000003",
+          "MACAddress": "00:00:5E:00:53:03",
+          "ZoneAssignment": [
+            2
+          ],
+          "IndoorBoardSettings": {
+            "Enabled": true,
+            "TemperatureOffset_oC": -1,
+            "DeviceConfig": 2
+          },
+          "ConnectionState": "Connected",
+          "Firmware": {
+            "InstalledVersion": {
+              "NRF52": "1.1.4.2",
+              "EFM8": "NA"
+            },
+            "Update": {
+              "CurrentState": "Idle",
+              "CurrentInstallProgress_pc": -1,
+              "Events": {
+                "LastStartTime": "NA",
+                "LastCompleteTime": "NA",
+                "LastFailureTime": "NA",
+                "LastFailureStep": "Idle"
+              },
+              "RunCount": 0,
+              "FailureCount": 0
+            }
+          },
+          "LastConnectionTime": "NA",
+          "ConnectionEventCounts": 1,
+          "RSSI": {
+            "Local": -45,
+            "Remote": "NA"
+          },
+          "RemainingBatteryCapacity_pc": 52,
+          "SensorInputs": {
+            "BatteyLevels": {
+              "B1V5": 1.4,
+              "B3V3": 1.3,
+              "B4V5": 1.4
+            },
+            "RS485": {
+              "PSU_Voltage": "NA"
+            },
+            "SHTC1": {
+              "RelativeHumidity_pc": 66,
+              "Temperature_oC": 21
+            },
+            "Thermistors": {
+              "Ambient_oC": 21.2,
+              "Wall_oC": 21.4
+            }
+          }
+        },
+        {
+          "LogicalAddress": 2,
+          "DeviceType": "NEO Zone Sensor",
+          "SerialNumber": "SN000004",
+          "MACAddress": "00:00:5E:00:53:04",
+          "ZoneAssignment": [
+            2
+          ],
+          "IndoorBoardSettings": {
+            "Enabled": true,
+            "TemperatureOffset_oC": -1,
+            "DeviceConfig": 2
+          },
+          "ConnectionState": "Connected",
+          "Firmware": {
+            "InstalledVersion": {
+              "NRF52": "1.1.4.2",
+              "EFM8": "NA"
+            },
+            "Update": {
+              "CurrentState": "Idle",
+              "CurrentInstallProgress_pc": -1,
+              "Events": {
+                "LastStartTime": "NA",
+                "LastCompleteTime": "NA",
+                "LastFailureTime": "NA",
+                "LastFailureStep": "Idle"
+              },
+              "RunCount": 0,
+              "FailureCount": 0
+            }
+          },
+          "LastConnectionTime": "NA",
+          "ConnectionEventCounts": 1,
+          "RSSI": {
+            "Local": -42,
+            "Remote": "NA"
+          },
+          "RemainingBatteryCapacity_pc": 57,
+          "SensorInputs": {
+            "BatteyLevels": {
+              "B1V5": 1.4,
+              "B3V3": 1.4,
+              "B4V5": 1.4
+            },
+            "RS485": {
+              "PSU_Voltage": "NA"
+            },
+            "SHTC1": {
+              "RelativeHumidity_pc": 62,
+              "Temperature_oC": 21.8
+            },
+            "Thermistors": {
+              "Ambient_oC": 22.5,
+              "Wall_oC": 22.6
+            }
+          }
+        },
+        {
+          "LogicalAddress": 3,
+          "DeviceType": "NEO Zone Sensor",
+          "SerialNumber": "SN000005",
+          "MACAddress": "00:00:5E:00:53:05",
+          "ZoneAssignment": [
+            2
+          ],
+          "IndoorBoardSettings": {
+            "Enabled": true,
+            "TemperatureOffset_oC": -1,
+            "DeviceConfig": 2
+          },
+          "ConnectionState": "Connected",
+          "Firmware": {
+            "InstalledVersion": {
+              "NRF52": "1.1.4.2",
+              "EFM8": "NA"
+            },
+            "Update": {
+              "CurrentState": "Idle",
+              "CurrentInstallProgress_pc": -1,
+              "Events": {
+                "LastStartTime": "NA",
+                "LastCompleteTime": "NA",
+                "LastFailureTime": "NA",
+                "LastFailureStep": "Idle"
+              },
+              "RunCount": 0,
+              "FailureCount": 0
+            }
+          },
+          "LastConnectionTime": "NA",
+          "ConnectionEventCounts": 1,
+          "RSSI": {
+            "Local": -40,
+            "Remote": "NA"
+          },
+          "RemainingBatteryCapacity_pc": 52,
+          "SensorInputs": {
+            "BatteyLevels": {
+              "B1V5": 1.4,
+              "B3V3": 1.4,
+              "B4V5": 1.4
+            },
+            "RS485": {
+              "PSU_Voltage": "NA"
+            },
+            "SHTC1": {
+              "RelativeHumidity_pc": 62,
+              "Temperature_oC": 22.1
+            },
+            "Thermistors": {
+              "Ambient_oC": 23,
+              "Wall_oC": 22.2
+            }
+          }
+        },
+        {
+          "LogicalAddress": 4,
+          "DeviceType": "NEO Zone Sensor",
+          "SerialNumber": "SN000006",
+          "MACAddress": "00:00:5E:00:53:06",
+          "ZoneAssignment": [
+            2
+          ],
+          "IndoorBoardSettings": {
+            "Enabled": true,
+            "TemperatureOffset_oC": -1,
+            "DeviceConfig": 2
+          },
+          "ConnectionState": "Connected",
+          "Firmware": {
+            "InstalledVersion": {
+              "NRF52": "1.1.4.2",
+              "EFM8": "NA"
+            },
+            "Update": {
+              "CurrentState": "Idle",
+              "CurrentInstallProgress_pc": -1,
+              "Events": {
+                "LastStartTime": "NA",
+                "LastCompleteTime": "NA",
+                "LastFailureTime": "NA",
+                "LastFailureStep": "Idle"
+              },
+              "RunCount": 0,
+              "FailureCount": 0
+            }
+          },
+          "LastConnectionTime": "NA",
+          "ConnectionEventCounts": 1,
+          "RSSI": {
+            "Local": -32,
+            "Remote": "NA"
+          },
+          "RemainingBatteryCapacity_pc": 59,
+          "SensorInputs": {
+            "BatteyLevels": {
+              "B1V5": 1.4,
+              "B3V3": 1.4,
+              "B4V5": 1.4
+            },
+            "RS485": {
+              "PSU_Voltage": "NA"
+            },
+            "SHTC1": {
+              "RelativeHumidity_pc": 63,
+              "Temperature_oC": 21.2
+            },
+            "Thermistors": {
+              "Ambient_oC": 21.7,
+              "Wall_oC": 21.5
+            }
+          }
+        }
+      ]
+    },
+    "Alerts": {
+      "CleanFilter": false,
+      "Defrosting": false
+    },
+    "AwayModeSavedState": {
+      "Master": {
+        "TemperatureSetpoint_Cool_oC": 26,
+        "TemperatureSetpoint_Heat_oC": 19
+      }
+    },
+    "LiveAircon": {
+      "AmRunningFan": false,
+      "CoilInlet": 27.8,
+      "CompressorCapacity": 0,
+      "CompressorChasingTemperature": 22,
+      "CompressorLiveTemperature": 20.9,
+      "CompressorMode": "OFF",
+      "DRM": false,
+      "Defrost": false,
+      "ErrCode": 0,
+      "FanPWM": 0,
+      "FanRPM": 0,
+      "IndoorUnitTemp": 0,
+      "OutdoorUnit": {
+        "AmbTemp": 0,
+        "AmbientSensErr": true,
+        "CoilSenseErr": false,
+        "CoilTemp": 22.9,
+        "CompPower": 0,
+        "CompRunningPWM": 0,
+        "CompSpeed": 0,
+        "CompressorMode": 0,
+        "CompressorOn": false,
+        "CompressorSetSpeed": 0,
+        "CompressorBoostEnable": 0,
+        "CompressorBoostScale": 0,
+        "FanSpeed": 0,
+        "ODFan": "NA",
+        "CondPc": 0,
+        "DRM": 0,
+        "DefrostMode": 0,
+        "DischargeTemp": 0,
+        "EEV": {
+          "Opening_pc": 0,
+          "SuperHeat": 3000,
+          "SuperHeatRef": 3000,
+          "Type": "UKV"
+        },
+        "EXV": false,
+        "ErrCode_1": 0,
+        "ErrCode_2": 0,
+        "ErrCode_3": 0,
+        "ErrCode_4": 0,
+        "ErrCode_5": 0,
+        "OilReturn": false,
+        "OilReturnEnable": false,
+        "RemoteOnOff": false,
+        "RoomTemp": 20.9,
+        "RoomTempODU": 20.9,
+        "RoomTempSet": 20.9,
+        "SuctP0": 0,
+        "SuctTemp": 0,
+        "EnvelopeProtection": false,
+        "ReverseValvePosition": "Cool",
+        "OverheatProtection": false,
+        "SupplyVoltage_Vac": 0,
+        "SupplyCurrentRMS_A": 0,
+        "SupplyPowerRMS_W": 0,
+        "OutputPowerRMS_W": 0,
+        "DriveTemp": 0,
+        "VSDODUCommsStatus": "OK",
+        "LPErr": false,
+        "HPErr": false,
+        "OHP": {
+          "TargetLine": 0,
+          "TargetCondTemp_oC": 0,
+          "StartTemp_oC": 0
+        }
+      },
+      "SystemOn": false
+    },
+    "MasterInfo": {
+      "LiveHumidity_pc": 59.3,
+      "LiveOutdoorTemp_oC": 3000,
+      "LiveTempHysteresis_oC": 20.9,
+      "LiveTemp_oC": 20.9,
+      "RemoteHumidity_pc": {
+        "NEO000000": 59.3
+      }
+    },
+    "NV_Limits": {
+      "UserSetpoint_oC": {
+        "MinGap": 0,
+        "VarianceAboveMasterCool": 0,
+        "VarianceAboveMasterHeat": 0,
+        "VarianceBelowMasterCool": 0,
+        "VarianceBelowMasterHeat": 0,
+        "setCool_Max": 30,
+        "setCool_Min": 16,
+        "setHeat_Max": 30,
+        "setHeat_Min": 16
+      }
+    },
+    "NV_QuickTimer": {
+      "Master": [
+        {
+          "OriginalTime": "01:00",
+          "Status": "Stopped",
+          "Mode": "Timer",
+          "Time": "00:00:00",
+          "Zones": [
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ]
+        }
+      ]
+    },
+    "NV_Schedule": {
+      "Enabled": false,
+      "Events": []
+    },
+    "NV_SystemSettings": {
+      "AwayMode": {
+        "TemperatureSetpoint_Cool_oC": 26,
+        "TemperatureSetpoint_Heat_oC": 19,
+        "TemperatureMinLimit_Cool_oC": 26,
+        "TemperatureMaxLimit_Cool_oC": 36,
+        "TemperatureMinLimit_Heat_oC": 10,
+        "TemperatureMaxLimit_Heat_oC": 20
+      },
+      "Logs": {
+        "snapshotTime_ms": 900000
+      },
+      "Display": {
+        "HomeScreen": {
+          "BackgroundColour": "Black",
+          "Brightness": 50
+        },
+        "ScreenSaver": {
+          "Enabled": true,
+          "Timeout_s": 60,
+          "Brightness": 30
+        },
+        "ScreenOff": {
+          "Enabled": true,
+          "Timeout_s": 60
+        }
+      },
+      "ProxmitySensor": {
+        "Enabled": true,
+        "Range_cm": 60
+      },
+      "LEDIndicators": {
+        "WallGlow": {
+          "Enabled": false
+        },
+        "OnOffButton": {
+          "Enabled": true
+        }
+      },
+      "Locks": {
+        "PIN": "",
+        "RentryTimeout_s": 0,
+        "HomeScreen": {
+          "ModeSelector": false,
+          "TemperatureSetpoint": false,
+          "FanSpeed": false,
+          "OnOffButton": false
+        },
+        "MenuSystem": {
+          "OptionsButton": false,
+          "Timer": false,
+          "Schedule": false,
+          "WiFiAccount": false,
+          "SystemSettings": false
+        }
+      },
+      "SystemName": "NEO_NEO000000",
+      "Time": {
+        "SetAutomatically": true,
+        "TimeMode24h": true,
+        "Timezone": "Australia/Queensland",
+        "Timezone_Readable": "QLD, Australia"
+      },
+      "UpdateTime": "T02:00:00",
+      "UserACSettings": {
+        "ControlParameters": {
+          "Compressor": {
+            "CutIn": {
+              "Cool_degC": 1,
+              "Heat_degC": -1
+            },
+            "CutOut": {
+              "Cool_degC": 0.5,
+              "Heat_degC": -0.5
+            },
+            "LowDemand": {
+              "Heat": {
+                "Supported": true,
+                "Enabled": true,
+                "Trigger_pc": 20,
+                "RunTime_m": 35
+              },
+              "Cool": {
+                "Supported": true,
+                "Enabled": true,
+                "Trigger_pc": 20,
+                "RunTime_m": 16
+              }
+            },
+            "MinimumDemand": {
+              "Heat": {
+                "Supported": true,
+                "Enabled": false,
+                "Demand_pc": 20
+              },
+              "Cool": {
+                "Supported": true,
+                "Enabled": false,
+                "Demand_pc": 20
+              }
+            },
+            "Continue_Fan": {
+              "Heat": {
+                "Supported": true,
+                "DamperPosition_pc": 0
+              },
+              "Cool": {
+                "Supported": true,
+                "DamperPosition_pc": 0
+              }
+            },
+            "ProtectionLimits": {
+              "Antifreeze": {
+                "EndTemperature_degC": 15,
+                "MaintainTemperature_degC": 7,
+                "TriggerTemperature_degC": 5
+              },
+              "Overheat": {
+                "TriggerTemperature_degC": 55
+              }
+            },
+            "Deadband_degC": 1,
+            "Proportional": 3,
+            "ZoneStopPosition_pc": 0
+          }
+        },
+        "DraftReduction": {
+          "HotStart": {
+            "Enabled": false,
+            "Temperature_degC": 25,
+            "Time_s": 30
+          },
+          "MinimumAirflow": {
+            "Supported": true,
+            "Enabled": false,
+            "Level": 400
+          }
+        },
+        "FanAlertTime_h": 990,
+        "Fanspeed": {
+          "High": 99,
+          "HighDefault": 99,
+          "HighRPM": 1290,
+          "Low": 60,
+          "LowDefault": 60,
+          "LowRPM": 1290,
+          "Med": 75,
+          "MedDefault": 75,
+          "MedRPM": 1290,
+          "DefrostFanPWM": 0,
+          "PowerOnTestRPM": 685,
+          "NumberOfPoles": 12,
+          "RPMErrorCheckEnabled": true
+        },
+        "enableFastHeat": false,
+        "restoreSettingsOnPowerUp": true
+      }
+    },
+    "RemoteZoneInfo": [
+      {
+        "CanOperate": true,
+        "CommonZone": false,
+        "LiveHumidity_pc": 66.5,
+        "LiveTempHysteresis_oC": 21.2,
+        "LiveTemp_oC": 21.2,
+        "NV_Exists": true,
+        "NV_Title": "Zone A",
+        "NV_VAV": false,
+        "NV_ITC": false,
+        "NV_ITD": false,
+        "NV_IHD": true,
+        "NV_IAC": true,
+        "AirflowControlEnabled": true,
+        "AirflowControlLocked": false,
+        "NV_amSetup": true,
+        "LastZoneProtection": true,
+        "Sensors": {
+          "NEO000000": {
+            "Connected": false,
+            "NV_Kind": "ZS: SN000003",
+            "NV_isPaired": true,
+            "NV_isViaRepeater": false,
+            "Signal_of3": "-45",
+            "TX_Power": 0,
+            "lastRssi": "-45"
+          }
+        },
+        "TemperatureSetpoint_Cool_oC": 23,
+        "TemperatureSetpoint_Heat_oC": 21.5,
+        "AirflowSetpoint": 100,
+        "ZonePosition": 20,
+        "ZoneMaxPosition": 100,
+        "ZoneMinPosition": 0
+      },
+      {
+        "CanOperate": true,
+        "CommonZone": false,
+        "LiveHumidity_pc": 64.4,
+        "LiveTempHysteresis_oC": 22.4,
+        "LiveTemp_oC": 22.4,
+        "NV_Exists": true,
+        "NV_Title": "Zone B",
+        "NV_VAV": false,
+        "NV_ITC": false,
+        "NV_ITD": false,
+        "NV_IHD": true,
+        "NV_IAC": true,
+        "AirflowControlEnabled": true,
+        "AirflowControlLocked": false,
+        "NV_amSetup": true,
+        "LastZoneProtection": false,
+        "Sensors": {
+          "NEO000000": {
+            "Connected": false,
+            "NV_Kind": "ZS: SN000004",
+            "NV_isPaired": true,
+            "NV_isViaRepeater": false,
+            "Signal_of3": "-42",
+            "TX_Power": 0,
+            "lastRssi": "-42"
+          }
+        },
+        "TemperatureSetpoint_Cool_oC": 23,
+        "TemperatureSetpoint_Heat_oC": 21.5,
+        "AirflowSetpoint": 100,
+        "ZonePosition": 0,
+        "ZoneMaxPosition": 60,
+        "ZoneMinPosition": 0
+      },
+      {
+        "CanOperate": true,
+        "CommonZone": false,
+        "LiveHumidity_pc": 63.8,
+        "LiveTempHysteresis_oC": 22.9,
+        "LiveTemp_oC": 22.9,
+        "NV_Exists": true,
+        "NV_Title": "Zone C",
+        "NV_VAV": false,
+        "NV_ITC": false,
+        "NV_ITD": false,
+        "NV_IHD": true,
+        "NV_IAC": true,
+        "AirflowControlEnabled": true,
+        "AirflowControlLocked": false,
+        "NV_amSetup": true,
+        "LastZoneProtection": false,
+        "Sensors": {
+          "NEO000000": {
+            "Connected": false,
+            "NV_Kind": "ZS: SN000005",
+            "NV_isPaired": true,
+            "NV_isViaRepeater": false,
+            "Signal_of3": "-40",
+            "TX_Power": 0,
+            "lastRssi": "-40"
+          }
+        },
+        "TemperatureSetpoint_Cool_oC": 23,
+        "TemperatureSetpoint_Heat_oC": 21.5,
+        "AirflowSetpoint": 100,
+        "ZonePosition": 0,
+        "ZoneMaxPosition": 60,
+        "ZoneMinPosition": 0
+      },
+      {
+        "CanOperate": true,
+        "CommonZone": false,
+        "LiveHumidity_pc": 63.8,
+        "LiveTempHysteresis_oC": 21.7,
+        "LiveTemp_oC": 21.7,
+        "NV_Exists": true,
+        "NV_Title": "Zone D",
+        "NV_VAV": false,
+        "NV_ITC": false,
+        "NV_ITD": false,
+        "NV_IHD": true,
+        "NV_IAC": true,
+        "AirflowControlEnabled": true,
+        "AirflowControlLocked": false,
+        "NV_amSetup": true,
+        "LastZoneProtection": false,
+        "Sensors": {
+          "NEO000000": {
+            "Connected": false,
+            "NV_Kind": "ZS: SN000006",
+            "NV_isPaired": true,
+            "NV_isViaRepeater": false,
+            "Signal_of3": "-32",
+            "TX_Power": 0,
+            "lastRssi": "-32"
+          }
+        },
+        "TemperatureSetpoint_Cool_oC": 23,
+        "TemperatureSetpoint_Heat_oC": 21.5,
+        "AirflowSetpoint": 100,
+        "ZonePosition": 0,
+        "ZoneMaxPosition": 60,
+        "ZoneMinPosition": 0
+      },
+      {
+        "CanOperate": true,
+        "CommonZone": false,
+        "LiveHumidity_pc": 62.9,
+        "LiveTempHysteresis_oC": 20.8,
+        "LiveTemp_oC": 20.8,
+        "NV_Exists": true,
+        "NV_Title": "Zone E",
+        "NV_VAV": false,
+        "NV_ITC": false,
+        "NV_ITD": false,
+        "NV_IHD": true,
+        "NV_IAC": true,
+        "AirflowControlEnabled": true,
+        "AirflowControlLocked": false,
+        "NV_amSetup": true,
+        "LastZoneProtection": false,
+        "Sensors": {
+          "NEO000000": {
+            "Connected": false,
+            "NV_Kind": "C1",
+            "NV_isPaired": false,
+            "NV_isViaRepeater": false,
+            "Signal_of3": "NA",
+            "TX_Power": 0,
+            "lastRssi": "NA"
+          }
+        },
+        "TemperatureSetpoint_Cool_oC": 23,
+        "TemperatureSetpoint_Heat_oC": 21.5,
+        "AirflowSetpoint": 100,
+        "ZonePosition": 20,
+        "ZoneMaxPosition": 100,
+        "ZoneMinPosition": 0
+      },
+      {
+        "CanOperate": false,
+        "CommonZone": false,
+        "LiveHumidity_pc": 62.3,
+        "LiveTempHysteresis_oC": 20.8,
+        "LiveTemp_oC": 20.8,
+        "NV_Exists": false,
+        "NV_Title": "Zone 6",
+        "NV_VAV": false,
+        "NV_ITC": false,
+        "NV_ITD": false,
+        "NV_IHD": true,
+        "NV_IAC": false,
+        "AirflowControlEnabled": false,
+        "AirflowControlLocked": false,
+        "NV_amSetup": true,
+        "LastZoneProtection": false,
+        "Sensors": {
+          "NEO000000": {
+            "Connected": false,
+            "NV_Kind": "C1",
+            "NV_isPaired": false,
+            "NV_isViaRepeater": false,
+            "Signal_of3": "NA",
+            "TX_Power": 0,
+            "lastRssi": "NA"
+          }
+        },
+        "TemperatureSetpoint_Cool_oC": 23,
+        "TemperatureSetpoint_Heat_oC": 21.5,
+        "AirflowSetpoint": 100,
+        "ZonePosition": 20,
+        "ZoneMaxPosition": 100,
+        "ZoneMinPosition": 0
+      },
+      {
+        "CanOperate": false,
+        "CommonZone": false,
+        "LiveHumidity_pc": 61.8,
+        "LiveTempHysteresis_oC": 20.8,
+        "LiveTemp_oC": 20.8,
+        "NV_Exists": false,
+        "NV_Title": "Zone 7",
+        "NV_VAV": false,
+        "NV_ITC": false,
+        "NV_ITD": false,
+        "NV_IHD": true,
+        "NV_IAC": false,
+        "AirflowControlEnabled": false,
+        "AirflowControlLocked": false,
+        "NV_amSetup": true,
+        "LastZoneProtection": false,
+        "Sensors": {
+          "NEO000000": {
+            "Connected": false,
+            "NV_Kind": "C1",
+            "NV_isPaired": false,
+            "NV_isViaRepeater": false,
+            "Signal_of3": "NA",
+            "TX_Power": 0,
+            "lastRssi": "NA"
+          }
+        },
+        "TemperatureSetpoint_Cool_oC": 23,
+        "TemperatureSetpoint_Heat_oC": 21.5,
+        "AirflowSetpoint": 100,
+        "ZonePosition": 20,
+        "ZoneMaxPosition": 100,
+        "ZoneMinPosition": 0
+      },
+      {
+        "CanOperate": false,
+        "CommonZone": false,
+        "LiveHumidity_pc": 61.5,
+        "LiveTempHysteresis_oC": 20.8,
+        "LiveTemp_oC": 20.8,
+        "NV_Exists": false,
+        "NV_Title": "Zone 8",
+        "NV_VAV": false,
+        "NV_ITC": false,
+        "NV_ITD": false,
+        "NV_IHD": true,
+        "NV_IAC": false,
+        "AirflowControlEnabled": false,
+        "AirflowControlLocked": false,
+        "NV_amSetup": true,
+        "LastZoneProtection": false,
+        "Sensors": {
+          "NEO000000": {
+            "Connected": false,
+            "NV_Kind": "C1",
+            "NV_isPaired": false,
+            "NV_isViaRepeater": false,
+            "Signal_of3": "NA",
+            "TX_Power": 0,
+            "lastRssi": "NA"
+          }
+        },
+        "TemperatureSetpoint_Cool_oC": 23,
+        "TemperatureSetpoint_Heat_oC": 21.5,
+        "AirflowSetpoint": 100,
+        "ZonePosition": 20,
+        "ZoneMaxPosition": 100,
+        "ZoneMinPosition": 0
+      }
+    ],
+    "Servicing": {
+      "NV_ErrorHistory": [
+        {
+          "Code": "E00",
+          "Description": "No Error",
+          "Severity": "No Error",
+          "Time": "2026-07-20T20:23:03"
+        },
+        {
+          "Code": "E103",
+          "Description": "Return Air Fan Filter requires cleaning",
+          "Severity": "Error",
+          "Time": "2026-07-13T07:12:43"
+        }
+      ]
+    },
+    "Installer": {
+      "Id": "",
+      "Name": "",
+      "Email": "",
+      "Phone": ""
+    },
+    "UserAirconSettings": {
+      "AfterHours": {
+        "Enabled": false,
+        "Duration": 120
+      },
+      "ApplicationMode": "Residential",
+      "AwayMode": false,
+      "EnabledZones": [
+        true,
+        false,
+        false,
+        false,
+        true,
+        false,
+        false,
+        false
+      ],
+      "FanMode": "HIGH",
+      "Mode": "HEAT",
+      "NV_SavedZoneState": [
+        true,
+        false,
+        false,
+        false,
+        true,
+        false,
+        false,
+        false
+      ],
+      "QuietMode": true,
+      "QuietModeEnabled": true,
+      "QuietModeActive": false,
+      "ModeSupport": {
+        "Cool": true,
+        "Heat": true,
+        "Fan": true,
+        "Auto": true,
+        "Dry": false
+      },
+      "ServiceReminder": {
+        "Enabled": false,
+        "Time": "NA"
+      },
+      "VFT": {
+        "Airflow": 0,
+        "StaticPressure": 0,
+        "Supported": false,
+        "Enabled": false,
+        "SelfLearn": {
+          "LastRunTime": "NA",
+          "CurrentState": "Idle",
+          "LastResult": "Idle",
+          "MaxStaticPressure": 0
+        }
+      },
+      "TurboMode": {
+        "Supported": false,
+        "Enabled": false
+      },
+      "TemperatureSetpoint_Cool_oC": 22,
+      "TemperatureSetpoint_Heat_oC": 22,
+      "ZoneTemperatureSetpointVariance_oC": 2,
+      "isFastHeating": false,
+      "isOn": false,
+      "ChangeSrc": {
+        "Mode": "GUI",
+        "isOn": "GUI"
+      }
+    },
+    "type": "full-status-broadcast"
+  },
+  "wcFirmware": "2.6.2.5"
+}

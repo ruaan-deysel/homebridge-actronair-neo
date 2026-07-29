@@ -1,0 +1,12 @@
+{
+  "_embedded": {
+    "ac-system": [
+      {
+        "serial": "neo000000",
+        "id": "UWx8L87b9oxAniETXJXG422r14sLOxOECosp9_U_o7c=",
+        "type": "neo",
+        "description": "Home"
+      }
+    ]
+  }
+}

@@ -1,0 +1,97 @@
+name: Test, Release & Publish
+
+# Pushes to main run the tests. Releasing is deliberate: push a tag, and that exact version is
+# published. Auto-bumping on every push hands the decision of what version ships to a CI action
+# rather than to the CHANGELOG — which is how a release intended as 1.0.0 goes out as 1.0.1.
+#
+# This file's NAME is load-bearing: npm's trusted publisher is configured against
+# `publish.yml` specifically, and publishing from a differently-named workflow is rejected.
+# Pull requests are covered by pr.yml, so they are not triggered here as well.
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [22.x, 24.x]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+
+  publish:
+    needs: test
+    if: startsWith(github.ref, 'refs/tags/v') && github.repository == 'ruaan-deysel/homebridge-actronair-neo'
+    runs-on: ubuntu-latest
+    # Must match the environment configured on npm's trusted publisher, or the OIDC claim
+    # will not match and npm refuses the publish.
+    environment: release
+    permissions:
+      # id-token lets npm verify this workflow via OIDC, so no long-lived token is stored
+      # anywhere. It is also what allows npm to attach build provenance.
+      id-token: write
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          registry-url: https://registry.npmjs.org
+          cache: npm
+
+      # Trusted publishing needs npm >= 11.5.1; the Node 22 runner image ships an older npm,
+      # which fails with an authentication error that looks nothing like a version problem.
+      - name: Ensure npm supports trusted publishing
+        run: npm install -g npm@latest
+
+      - run: npm ci
+
+      # A tag disagreeing with package.json would publish a version nobody asked for, under a
+      # tag then pointing at the wrong code. Fail before publishing rather than after.
+      - name: Verify tag matches package.json version
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          PKG="$(node -p "require('./package.json').version")"
+          if [ "$TAG" != "$PKG" ]; then
+            echo "::error::Tag v$TAG does not match package.json version $PKG."
+            exit 1
+          fi
+          echo "Publishing $PKG"
+
+      # npm refuses to republish an existing version, which would fail the whole job on a
+      # re-run or on a tag cut for a version already released by hand. Skip instead, so the
+      # release notes still get created and re-running a tag is safe.
+      - name: Check whether this version is already on npm
+        id: published
+        run: |
+          PKG="$(node -p "require('./package.json').version")"
+          NAME="$(node -p "require('./package.json').name")"
+          if curl -sf "https://registry.npmjs.org/$NAME/$PKG" > /dev/null; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::$NAME@$PKG is already published — skipping npm publish."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # No NODE_AUTH_TOKEN: authentication comes from the OIDC identity of this workflow.
+      - name: Publish to npm
+        if: steps.published.outputs.exists == 'false'
+        run: npm publish --access public
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
+        with:
+          tag_name: ${{ github.ref_name }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
