@@ -48,3 +48,9 @@ updates:
       # major here produces a PR that cannot pass CI.
       - dependency-name: typescript
         update-types: [version-update:semver-major]
+      # @types/node must track the OLDEST runtime in `engines` (Node 22), not the newest
+      # release. Types describing a newer Node let tsc accept APIs that do not exist on a
+      # supported version — it compiles here and throws for the user. CI cannot catch this:
+      # the types are what tell tsc the call is valid.
+      - dependency-name: '@types/node'
+        update-types: [version-update:semver-major]
