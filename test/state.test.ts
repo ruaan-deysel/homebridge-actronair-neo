@@ -19,6 +19,64 @@ describe('neoState', () => {
     expect(s.get('UserAirconSettings.Mode')).toBeTypeOf('string')
   })
 
+  describe('an optional subtree appearing or disappearing', () => {
+    // diffPaths can't recurse into `undefined`, so it used to report only the parent path.
+    // Every accessory watches leaf paths (Alerts.CleanFilter, LiveAircon.OutdoorUnit
+    // .AmbientSensErr, UserAirconSettings.AfterHours.Enabled), so they all silently missed the
+    // change and stayed on their previous value.
+    it('reports the leaf paths beneath it, not just the parent', () => {
+      const s = new NeoState()
+      const without = tree() as Record<string, unknown>
+      delete without.Alerts
+      s.replace(without as never)
+      let seen = new Set<string>()
+      s.onChange((paths) => {
+        seen = paths
+      })
+
+      const withAlerts = tree() as Record<string, unknown>
+      withAlerts.Alerts = { CleanFilter: true, Defrosting: false }
+      s.replace(withAlerts as never)
+
+      expect(seen).toContain('Alerts.CleanFilter')
+      expect(seen).toContain('Alerts')
+    })
+
+    it('reports them on the way out too, so a watcher is told the value is gone', () => {
+      const s = new NeoState()
+      const withUnit = tree() as Record<string, unknown>
+      withUnit.LiveAircon = { ...(withUnit.LiveAircon as object), OutdoorUnit: { AmbientSensErr: true } }
+      s.replace(withUnit as never)
+      let seen = new Set<string>()
+      s.onChange((paths) => {
+        seen = paths
+      })
+
+      const withoutUnit = tree() as Record<string, unknown>
+      const liveAircon = { ...(withUnit.LiveAircon as Record<string, unknown>) }
+      delete liveAircon.OutdoorUnit
+      withoutUnit.LiveAircon = liveAircon
+      s.replace(withoutUnit as never)
+
+      expect(seen).toContain('LiveAircon.OutdoorUnit.AmbientSensErr')
+    })
+
+    it('still reports a plain scalar change as just that path', () => {
+      const s = new NeoState()
+      s.replace(tree())
+      let seen = new Set<string>()
+      s.onChange((paths) => {
+        seen = paths
+      })
+
+      const next = tree()
+      next.UserAirconSettings.Mode = 'FAN'
+      s.replace(next)
+
+      expect([...seen]).toEqual(['UserAirconSettings.Mode'])
+    })
+  })
+
   it('applies a dotted delta and notifies listeners with changed paths', () => {
     const s = new NeoState()
     s.replace(tree())

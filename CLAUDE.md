@@ -83,8 +83,15 @@ A Homebridge dynamic platform plugin for ActronAir Neo HVAC, talking to the Neo 
    "characteristic value ignored" warnings when nothing actually changed, which is why
    updates are scoped to the paths that moved.
 
-2. **`NeoState` (`src/neo/state.ts`) is the single authoritative tree.** `replace()` takes
-   a full snapshot (a REST poll or an MQTT full-status). `applyDelta()`
+2. **`NeoState` (`src/neo/state.ts`) is the single authoritative tree.** Its change set reports
+   **leaf paths, including when an optional subtree appears or disappears wholesale** — `diffPaths`
+   cannot recurse into `undefined`, so that case is detected at the parent (`Alerts`,
+   `LiveAircon.OutdoorUnit`, `UserAirconSettings.AfterHours`, `TurboMode`) and the leaves beneath
+   are then emitted explicitly. Every accessory watches leaves, so without that they all silently
+   keep their previous value through exactly the transition that matters. Don't "simplify" it back
+   to emitting only the parent, and don't paper over it by making accessories watch ancestors too —
+   that's the same bug re-introduced N times, once per accessory that forgets.
+   `replace()` takes a full snapshot (a REST poll or an MQTT full-status). `applyDelta()`
    takes a flat map of dotted/bracket paths (`RemoteZoneInfo[0].LiveTemp_oC`) — the same
    notation Neo uses for both MQTT status-change deltas and outgoing commands, see
    `src/neo/paths.ts`. `applyDelta()` reports `ok: false` with the offending paths in
@@ -180,5 +187,21 @@ A Homebridge dynamic platform plugin for ActronAir Neo HVAC, talking to the Neo 
    startup otherwise) and seeded **only while empty** — the Home app writes a user's rename back
    into that same characteristic, so re-applying it on every startup silently reverts their choice
    on every restart. Checking for an empty value rather than "is the service new" is what also
-   gives a service cached from before this existed a name at all. Dry mode has no equivalent yet — no unit seen reports
-   `ModeSupport.Dry`.
+   gives a service cached from before this existed a name at all. `nameSubService()` applies all of
+   that to every service needing its own name (the fan, the filter), and the suffixes it uses are
+   exported as `MASTER_SERVICE_NAME_SUFFIXES` so `platform.ts`'s stale-name reconcile can exempt
+   exactly those and nothing else — a prefix test there would re-exempt genuinely stale names.
+   Dry mode has no equivalent yet — no unit seen reports `ModeSupport.Dry`.
+
+10. **`StatusActive`/`StatusFault` belong on sensor services only, and mean what HAP says.** Every
+    sensor here serves a last-known-good reading rather than a fabricated one, so without
+    `StatusActive` nothing distinguishes a live value from one the controller stopped reporting.
+    `StatusFault` is reported *only* where the device names a sensor fault
+    (`LiveAircon.OutdoorUnit.AmbientSensErr` → the outdoor sensor). A system-wide `ErrCode` is not
+    a sensor fault, and HeaterCooler has no such characteristic in its HAP definition at all, so
+    pushing system errors through either would be a lie the Home app is entitled to ignore — which
+    is why `LiveAircon.ErrCode` and `Servicing.NV_ErrorHistory` stay unexposed rather than being
+    bolted onto a service that would misreport them.
+    In `outdoorTemp.ts` the status characteristics are pushed **before** `CurrentTemperature`,
+    which throws when no usable reading has ever arrived: `NeoState.emit` swallows a throwing
+    listener, so the reverse order silently dropped the characteristics explaining the failure.

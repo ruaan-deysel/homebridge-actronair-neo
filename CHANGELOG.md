@@ -5,6 +5,39 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-07-30
+
+### Added
+
+- **Filter status.** The unit's own `Alerts.CleanFilter` is exposed as a FilterMaintenance
+  service on the main accessory — HomeKit's own service for exactly this, so the Home app shows
+  the filter alert the ActronAir controller raises (its error log records E103, "Return Air Fan
+  Filter requires cleaning"). No reset button: the cloud API has no documented filter reset, and
+  a button that silently does nothing is worse than none. A unit that reports no filter alert at
+  all reads as OK rather than nagging about a filter nobody has been told about.
+- **The Fan tile reports whether air is actually moving** (`CurrentFanState`), not just whether
+  fan-only is selected — the unit can sit in FAN mode between cycles, and during spin-up.
+- **Sensor staleness and faults.** The main humidity sensor and the outdoor temperature sensor
+  now carry `StatusActive`, the signal zone sensors already had: both serve their last known
+  reading when the controller stops reporting, and until now nothing distinguished that from a
+  live value. The outdoor sensor also reports `StatusFault` when the unit says its ambient
+  sensor has failed (`AmbientSensErr`) — which is what that characteristic means, and why a
+  system-wide error code is deliberately not reported through it.
+
+### Fixed
+
+- **An optional part of the status tree appearing or disappearing wholesale no longer leaves
+  characteristics stuck on their previous value.** The change detector could not describe such a
+  transition below the subtree itself, so it reported only the parent path — while every
+  accessory watches the leaf beneath it. Filter status, the outdoor sensor's fault and staleness
+  flags, After Hours and Turbo were all affected. Leaf paths are now reported too, so a leaf
+  watcher is correct without every accessory having to watch each ancestor as well.
+- The outdoor temperature sensor no longer reports a communication failure after a reading goes
+  bad when a perfectly good one was in state moments earlier. Its last-known-good value was only
+  ever recorded by a read, so if HomeKit hadn't yet asked, there was nothing to fall back to; it
+  is now seeded at startup. Its status characteristics are also pushed before the temperature,
+  which can throw — otherwise the very characteristics that explain the failure were skipped.
+
 ## [1.1.0] - 2026-07-30
 
 ### Added

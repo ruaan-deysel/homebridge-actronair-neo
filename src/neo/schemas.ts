@@ -138,6 +138,13 @@ export const StatusTreeSchema = z.looseObject({
   UserAirconSettings: UserAirconSettingsSchema,
   AirconSystem: AirconSystemSchema.default({}),
   /**
+   * System alerts. Only CleanFilter is consumed (accessories/master.ts, the FilterMaintenance
+   * service); Defrosting is real but has no HomeKit equivalent worth faking a service for.
+   */
+  Alerts: z.looseObject({
+    CleanFilter: z.boolean().optional(),
+  }).optional(),
+  /**
    * Device-reported zone setpoint bounds. Coerced — the live API has sent numbers as
    * strings elsewhere (see ConnectionDetailsSchema.Port), and these values feed a write
    * path (zone setpoint clamping/push), so a silent string-concat bug is not acceptable.
@@ -252,6 +259,8 @@ const ALLOWED_DELTA_PATHS: Record<string, z.ZodTypeAny> = {
   'NV_Limits.UserSetpoint_oC.VarianceBelowMasterCool': numeric,
   'NV_Limits.UserSetpoint_oC.VarianceAboveMasterHeat': numeric,
   'NV_Limits.UserSetpoint_oC.VarianceBelowMasterHeat': numeric,
+
+  'Alerts.CleanFilter': z.boolean(),
 
   'MasterInfo.LiveTemp_oC': numeric,
   'MasterInfo.LiveHumidity_pc': numeric,

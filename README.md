@@ -23,6 +23,8 @@ The plugin exposes an ActronAir Neo system as HomeKit accessories through Homebr
 
 - The master controller as a Heater/Cooler accessory, reporting and setting mode, fan
   speed, temperature and humidity.
+- The filter alert as a Filter service on the same accessory, so the Home app tells you when
+  the controller wants the return-air filter cleaned.
 - Fan-only mode as a Fan on the same accessory, when your unit supports it. HomeKit's
   thermostat has no fan-only setting of its own (it offers Off, Cool, Heat and Auto only), so
   the Fan is how you reach the ActronAir app's **Fan** mode. Turning it on switches the system

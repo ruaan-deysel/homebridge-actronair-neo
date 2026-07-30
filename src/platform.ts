@@ -10,7 +10,7 @@ import type {
 import type { NeoConfig } from './config.js'
 import type { NeoCapabilities } from './neo/capabilities.js'
 import { AfterHoursAccessory } from './accessories/afterHours.js'
-import { MasterAccessory } from './accessories/master.js'
+import { MASTER_SERVICE_NAME_SUFFIXES, MasterAccessory } from './accessories/master.js'
 import { ModeSwitchAccessory } from './accessories/modeSwitch.js'
 import { OutdoorTempAccessory } from './accessories/outdoorTemp.js'
 import { ZoneAccessory } from './accessories/zone.js'
@@ -58,6 +58,14 @@ function withDebugLogging(log: Logging): Logging {
   })
 }
 
+/**
+ * Deliberately no accessory `category`. It looks like the way to get a proper air-conditioner
+ * icon instead of a generic one, but `Accessory.toHAP()` emits only `{ aid, services }` — a
+ * bridged accessory's category never reaches HomeKit, which derives the icon from the services
+ * instead. Category only travels in the mDNS advertisement of a *standalone* accessory
+ * (`publishExternalAccessories`, which needs its own pairing). Setting it here would be inert
+ * code that reads as a feature.
+ */
 interface Discovered {
   id: string
   displayName: string
@@ -288,15 +296,17 @@ export class ActronAirNeoPlatform implements DynamicPlatformPlugin {
         // only when displayName itself just changed — once displayName has been corrected on an
         // earlier run, that condition is false while the service names are still wrong.
         // Names a service is allowed to carry: the accessory's own, plus the ones an accessory
-        // deliberately derives from it — MasterAccessory's fan-only service is "<name> Fan",
-        // and reconciling that away would leave two identically-named tiles in the Home app.
-        // Exact names rather than a prefix test, and only for the accessory that actually owns
-        // such a service: either shortcut would exempt a genuinely stale name (a zone renamed
-        // "Study Fan" → "Study" keeps sub-services cached as "Study Fan"), which is the drift
-        // this loop exists to fix.
+        // deliberately derives from it (MasterAccessory names its fan-only and filter services
+        // "<name> Fan"/"<name> Filter"). Reconciling those away would leave several
+        // identically-named tiles in the Home app. Exact names rather than a prefix test, and
+        // only for the accessory that actually owns them: either shortcut would exempt a
+        // genuinely stale name (a zone renamed "Study Fan" → "Study" keeps sub-services cached
+        // as "Study Fan"), which is the drift this loop exists to fix.
         const allowedServiceNames = new Set([accessory.displayName])
-        if (device.kind === 'master')
-          allowedServiceNames.add(`${accessory.displayName} Fan`)
+        if (device.kind === 'master') {
+          for (const suffix of MASTER_SERVICE_NAME_SUFFIXES)
+            allowedServiceNames.add(`${accessory.displayName} ${suffix}`)
+        }
         let staleServiceName = false
         for (const service of accessory.services) {
           if (!service.testCharacteristic(this.Characteristic.Name))

@@ -26,6 +26,12 @@ export class OutdoorTempAccessory {
       .setCharacteristic(this.platform.Characteristic.Model, this.platform.capabilities?.model ?? 'ActronAir Neo Outdoor Temperature')
       .setCharacteristic(this.platform.Characteristic.SerialNumber, this.platform.serial)
 
+    // Seeded from state rather than left to the first read. lastGood used to be populated only
+    // when something actually read the characteristic, so a reading that went bad before HomeKit
+    // ever asked made the accessory throw SERVICE_COMMUNICATION_FAILURE despite a perfectly good
+    // value having been in state moments earlier.
+    this.lastGood = getUsableOutdoorTemp(this.platform.state)
+
     this.service = this.accessory.getService(this.platform.Service.TemperatureSensor)
       || this.accessory.addService(this.platform.Service.TemperatureSensor)
 
@@ -34,11 +40,32 @@ export class OutdoorTempAccessory {
     this.service.getCharacteristic(this.platform.Characteristic.CurrentTemperature)
       .onGet(this.getCurrentTemperature.bind(this))
 
+    // Without these the tile shows the last-known reading indefinitely with nothing to say it
+    // has gone stale — the same signal zone sensors already carry. StatusFault is the honest
+    // home for AmbientSensErr specifically: the unit is telling us its ambient sensor is
+    // faulty, which is exactly what the characteristic means (a system-wide ErrCode would not
+    // be, which is why it isn't reported here).
+    this.service.getCharacteristic(this.platform.Characteristic.StatusActive)
+      .onGet(() => getUsableOutdoorTemp(this.platform.state) !== undefined)
+    this.service.getCharacteristic(this.platform.Characteristic.StatusFault)
+      .onGet(this.getStatusFault.bind(this))
+
     // Single poll loop lives on the platform; no timer here.
     this.platform.state.onChange((changed) => {
-      if (changed.has('*') || changed.has(WATCHED.outdoorTemp) || changed.has(WATCHED.sensErr))
+      if (changed.has('*') || changed.has(WATCHED.outdoorTemp) || changed.has(WATCHED.sensErr)) {
+        // Status first, deliberately: getCurrentTemperature() throws when there has never been a
+        // usable reading, and NeoState swallows a throwing listener — pushing the temperature
+        // first would drop the very characteristics that explain why it failed.
+        this.service.updateCharacteristic(this.platform.Characteristic.StatusActive, getUsableOutdoorTemp(this.platform.state) !== undefined)
+        this.service.updateCharacteristic(this.platform.Characteristic.StatusFault, this.getStatusFault())
         this.service.updateCharacteristic(this.platform.Characteristic.CurrentTemperature, this.getCurrentTemperature())
+      }
     })
+  }
+
+  getStatusFault(): CharacteristicValue {
+    const { NO_FAULT, GENERAL_FAULT } = this.platform.Characteristic.StatusFault
+    return this.platform.state.get<boolean>(WATCHED.sensErr) === true ? GENERAL_FAULT : NO_FAULT
   }
 
   getCurrentTemperature(): CharacteristicValue {

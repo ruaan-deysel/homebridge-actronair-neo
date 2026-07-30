@@ -52,6 +52,8 @@ const Characteristic = {
   SerialNumber: 'SerialNumber',
   Name: 'Name',
   CurrentTemperature: 'CurrentTemperature',
+  StatusActive: 'StatusActive',
+  StatusFault: { NO_FAULT: 0, GENERAL_FAULT: 1 },
 }
 
 const ServiceTokens = {
@@ -178,6 +180,57 @@ describe('outdoorTempAccessory', () => {
 
     expect(() => outdoor.getCurrentTemperature()).toThrow()
     expect(() => outdoor.getCurrentTemperature()).toThrowError(expect.objectContaining({ hapStatus: HAPStatus.SERVICE_COMMUNICATION_FAILURE }))
+  })
+
+  it('reports a fault when the unit says its ambient sensor has failed, and clears it when it recovers', () => {
+    const { state, outdoor, sensor } = makeHarness(baseTree())
+    expect(outdoor.getStatusFault()).toBe(Characteristic.StatusFault.NO_FAULT)
+
+    state.applyDelta({ 'LiveAircon.OutdoorUnit.AmbientSensErr': true })
+
+    expect(outdoor.getStatusFault()).toBe(Characteristic.StatusFault.GENERAL_FAULT)
+    expect(sensor.updates.some(u => u.id === Characteristic.StatusFault && u.value === Characteristic.StatusFault.GENERAL_FAULT)).toBe(true)
+
+    state.applyDelta({ 'LiveAircon.OutdoorUnit.AmbientSensErr': false })
+    expect(outdoor.getStatusFault()).toBe(Characteristic.StatusFault.NO_FAULT)
+  })
+
+  it('marks the sensor inactive once the reading stops being usable, while still serving the last good value', () => {
+    // Without this the tile shows a stale temperature indefinitely with nothing to say so.
+    const { state, outdoor, sensor } = makeHarness(baseTree())
+    expect(sensor.getCharacteristic(Characteristic.StatusActive).invokeGet()).toBe(true)
+
+    state.applyDelta({ 'MasterInfo.LiveOutdoorTemp_oC': 3000 })
+
+    expect(sensor.getCharacteristic(Characteristic.StatusActive).invokeGet()).toBe(false)
+    expect(outdoor.getCurrentTemperature()).toBe(18)
+  })
+
+  it('pushes status when the whole OutdoorUnit subtree appears, not just when AmbientSensErr flips', () => {
+    const withoutUnit = baseTree() as Record<string, unknown>
+    withoutUnit.LiveAircon = { CompressorMode: 'COOL', AmRunningFan: true }
+    const { state, sensor } = makeHarness(withoutUnit as never)
+    sensor.updates.length = 0
+
+    state.replace({ ...baseTree(), LiveAircon: { CompressorMode: 'COOL', AmRunningFan: true, OutdoorUnit: { AmbientSensErr: true } } } as never)
+
+    expect(sensor.updates.some(u => u.id === Characteristic.StatusFault && u.value === Characteristic.StatusFault.GENERAL_FAULT)).toBe(true)
+  })
+
+  it('records the status characteristics even when the temperature push throws', () => {
+    // getCurrentTemperature() throws while no usable reading has ever arrived, and NeoState
+    // swallows a throwing listener — pushing the temperature first dropped the very
+    // characteristics that explain the failure.
+    const tree = baseTree()
+    tree.MasterInfo.LiveOutdoorTemp_oC = 3000
+    const { state, sensor } = makeHarness(tree)
+    sensor.updates.length = 0
+
+    state.applyDelta({ 'LiveAircon.OutdoorUnit.AmbientSensErr': true })
+
+    expect(sensor.updates.some(u => u.id === Characteristic.StatusActive && u.value === false)).toBe(true)
+    expect(sensor.updates.some(u => u.id === Characteristic.StatusFault && u.value === Characteristic.StatusFault.GENERAL_FAULT)).toBe(true)
+    expect(sensor.updates.some(u => u.id === Characteristic.CurrentTemperature)).toBe(false)
   })
 
   it('updates only when the outdoor temperature or sensor-error path changes', () => {

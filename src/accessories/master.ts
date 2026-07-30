@@ -5,6 +5,13 @@ import { getUsableMasterHumidity, getUsableMasterTemp, resolveSetpointBounds } f
 import { ClimateMode, CompressorMode, FanMode, NeoCommand } from '../neo/types.js'
 import { assertCommandSuccess } from './assertCommandResult.js'
 
+/**
+ * Suffixes this accessory appends to its own display name for the services that need a name of
+ * their own. Exported because platform.ts must leave exactly these alone when it reconciles
+ * stale service names — see syncAccessories().
+ */
+export const MASTER_SERVICE_NAME_SUFFIXES = ['Fan', 'Filter'] as const
+
 /** Paths this accessory's characteristics depend on. Anything else is another accessory's business. */
 const WATCHED = {
   power: 'UserAirconSettings.isOn',
@@ -16,6 +23,7 @@ const WATCHED = {
   humidity: 'MasterInfo.LiveHumidity_pc',
   compressorMode: 'LiveAircon.CompressorMode',
   fanRunning: 'LiveAircon.AmRunningFan',
+  cleanFilter: 'Alerts.CleanFilter',
 } as const
 
 /** Plain (non +CONT) command for each fan speed the slider can select. */
@@ -72,6 +80,14 @@ export class MasterAccessory {
    * Absent when the unit doesn't support fan-only.
    */
   private readonly fanOnlyService?: Service
+  /**
+   * Filter status. The unit reports `Alerts.CleanFilter` (and logs E103 "Return Air Fan Filter
+   * requires cleaning" in its error history) — FilterMaintenance is HomeKit's own service for
+   * exactly this, so it beats a Switch or a fabricated sensor. No `ResetFilterIndication`: the
+   * cloud API has no documented reset, and a reset button that silently does nothing is worse
+   * than no button.
+   */
+  private readonly filterService: Service
   private readonly fanBands: FanBand[]
   /** TargetHeaterCoolerState values this unit accepts — HAP rejects anything outside them. */
   private readonly climateTargets: number[]
@@ -116,6 +132,12 @@ export class MasterAccessory {
 
     this.humidityService.getCharacteristic(this.platform.Characteristic.CurrentRelativeHumidity)
       .onGet(this.getHumidity.bind(this))
+
+    // Same staleness signal the zone sensors already carry: getHumidity() serves the last good
+    // reading (or 0 before any arrives), so without this there is nothing to distinguish a live
+    // 50% from one the controller stopped reporting.
+    this.humidityService.getCharacteristic(this.platform.Characteristic.StatusActive)
+      .onGet(() => getUsableMasterHumidity(this.platform.state) !== undefined)
 
     this.hvacService.getCharacteristic(this.platform.Characteristic.Active)
       .onSet(this.setPowerState.bind(this))
@@ -195,29 +217,16 @@ export class MasterAccessory {
     const cachedFanOnly = this.accessory.getService(this.platform.Service.Fanv2)
     if (modes?.fan ?? true) {
       this.fanOnlyService = cachedFanOnly ?? this.accessory.addService(this.platform.Service.Fanv2)
-      const fanName = `${accessory.displayName} Fan`
-      this.fanOnlyService.setCharacteristic(this.platform.Characteristic.Name, fanName)
-
-      // `Name` alone is not enough for the Home app. Since iOS 16 it seeds each service's name
-      // from the *accessory* name and syncs per-service names through ConfiguredName, so without
-      // this the fan tile reads "ActronAir Neo" — indistinguishable from the thermostat beside
-      // it. Declared optional first because ConfiguredName isn't in Fanv2's HAP definition and
-      // getCharacteristic() would otherwise log a characteristic warning every startup.
-      //
-      // Seeded only when it has no value yet — on a fresh service, or on one cached from before
-      // this existed. Never re-set once it holds something: the Home app writes a user's rename
-      // back into this same characteristic, and re-applying it every startup is a well-trodden
-      // way to clobber their choice on every restart. That is also why a later rename in the
-      // plugin config moves `Name` but leaves an established ConfiguredName alone.
-      const configured = this.fanOnlyService.testCharacteristic(this.platform.Characteristic.ConfiguredName)
-      if (!configured)
-        this.fanOnlyService.addOptionalCharacteristic(this.platform.Characteristic.ConfiguredName)
-      if (!configured || !this.fanOnlyService.getCharacteristic(this.platform.Characteristic.ConfiguredName).value)
-        this.fanOnlyService.setCharacteristic(this.platform.Characteristic.ConfiguredName, fanName)
+      this.nameSubService(this.fanOnlyService, 'Fan')
 
       this.fanOnlyService.getCharacteristic(this.platform.Characteristic.Active)
         .onGet(this.getFanOnlyActive.bind(this))
         .onSet(this.setFanOnlyActive.bind(this))
+
+      // Whether air is actually moving, which Active alone can't say: the unit can be in FAN
+      // mode with the fan between cycles.
+      this.fanOnlyService.getCharacteristic(this.platform.Characteristic.CurrentFanState)
+        .onGet(this.getFanOnlyState.bind(this))
 
       // Same fan speed as the thermostat's slider, deliberately — there is one FanMode on the
       // wire, and fan-only mode is where a user most wants to reach it.
@@ -231,8 +240,40 @@ export class MasterAccessory {
       this.accessory.removeService(cachedFanOnly)
     }
 
+    this.filterService = this.accessory.getService(this.platform.Service.FilterMaintenance)
+      ?? this.accessory.addService(this.platform.Service.FilterMaintenance)
+    this.nameSubService(this.filterService, 'Filter')
+    this.filterService.getCharacteristic(this.platform.Characteristic.FilterChangeIndication)
+      .onGet(this.getFilterChangeIndication.bind(this))
+
     // Single poll loop lives on the platform now; this replaces the two setInterval timers.
     this.platform.state.onChange(changed => this.pushCharacteristics(changed))
+  }
+
+  /**
+   * Gives a service on this accessory a name of its own ("<accessory> Fan"). `Name` alone is not
+   * enough for the Home app: since iOS 16 it seeds each service's name from the *accessory* name
+   * and syncs per-service names through `ConfiguredName`, so without that every tile on this
+   * accessory reads identically. ConfiguredName is declared optional first because it isn't in
+   * these services' HAP definitions, and `getCharacteristic` would otherwise log a characteristic
+   * warning on every startup.
+   *
+   * Seeded only while empty — on a fresh service, or one cached from before this existed. Never
+   * re-set once it holds something: the Home app writes a user's rename into that same
+   * characteristic, and re-applying it every startup is a well-trodden way to revert their choice
+   * on every restart. That is also why a later rename in the plugin config moves `Name` but
+   * leaves an established ConfiguredName alone.
+   */
+  private nameSubService(service: Service, suffix: typeof MASTER_SERVICE_NAME_SUFFIXES[number]): void {
+    const { ConfiguredName } = this.platform.Characteristic
+    const name = `${this.accessory.displayName} ${suffix}`
+    service.setCharacteristic(this.platform.Characteristic.Name, name)
+
+    const declared = service.testCharacteristic(ConfiguredName)
+    if (!declared)
+      service.addOptionalCharacteristic(ConfiguredName)
+    if (!declared || !service.getCharacteristic(ConfiguredName).value)
+      service.setCharacteristic(ConfiguredName, name)
   }
 
   private pushCharacteristics(changed: Set<string>): void {
@@ -256,18 +297,30 @@ export class MasterAccessory {
     if (all || changed.has(WATCHED.currentTemp))
       this.hvacService.updateCharacteristic(this.platform.Characteristic.CurrentTemperature, this.getCurrentTemperature())
 
-    if (all || changed.has(WATCHED.humidity))
+    if (all || changed.has(WATCHED.humidity)) {
       this.humidityService.updateCharacteristic(this.platform.Characteristic.CurrentRelativeHumidity, this.getHumidity())
+      this.humidityService.updateCharacteristic(
+        this.platform.Characteristic.StatusActive,
+        getUsableMasterHumidity(this.platform.state) !== undefined,
+      )
+    }
 
     if (all || changed.has(WATCHED.power) || changed.has(WATCHED.compressorMode) || changed.has(WATCHED.fanRunning))
       this.hvacService.updateCharacteristic(this.platform.Characteristic.CurrentHeaterCoolerState, this.getCurrentCompressorMode())
 
     if (this.fanOnlyService) {
-      if (all || changed.has(WATCHED.power) || changed.has(WATCHED.mode))
+      if (all || changed.has(WATCHED.power) || changed.has(WATCHED.mode)) {
         this.fanOnlyService.updateCharacteristic(this.platform.Characteristic.Active, this.getFanOnlyActive())
+        this.fanOnlyService.updateCharacteristic(this.platform.Characteristic.CurrentFanState, this.getFanOnlyState())
+      }
+      if (all || changed.has(WATCHED.fanRunning))
+        this.fanOnlyService.updateCharacteristic(this.platform.Characteristic.CurrentFanState, this.getFanOnlyState())
       if (all || changed.has(WATCHED.fanMode))
         this.fanOnlyService.updateCharacteristic(this.platform.Characteristic.RotationSpeed, this.getFanMode())
     }
+
+    if (all || changed.has(WATCHED.cleanFilter))
+      this.filterService.updateCharacteristic(this.platform.Characteristic.FilterChangeIndication, this.getFilterChangeIndication())
   }
 
   private checkHvacComms(): void {
@@ -376,6 +429,27 @@ export class MasterAccessory {
       && this.platform.state.get<string>(WATCHED.mode) === ClimateMode.FAN
       ? ACTIVE
       : INACTIVE
+  }
+
+  /**
+   * INACTIVE when fan-only isn't the mode, then IDLE vs BLOWING_AIR from whether the unit
+   * reports the fan actually turning — fan-only is a thermostat-driven cycle, not a fan running
+   * flat out, so Active alone would claim air is moving during every gap between cycles.
+   */
+  getFanOnlyState(): CharacteristicValue {
+    const { INACTIVE, IDLE, BLOWING_AIR } = this.platform.Characteristic.CurrentFanState
+    if (this.getFanOnlyActive() !== this.platform.Characteristic.Active.ACTIVE)
+      return INACTIVE
+    return this.platform.state.get<boolean>(WATCHED.fanRunning) ? BLOWING_AIR : IDLE
+  }
+
+  /**
+   * The unit's own filter alert. Absent (an older firmware, or a status tree that hasn't
+   * reported it yet) reads as OK rather than nagging about a filter nobody has been told about.
+   */
+  getFilterChangeIndication(): CharacteristicValue {
+    const { FILTER_OK, CHANGE_FILTER } = this.platform.Characteristic.FilterChangeIndication
+    return this.platform.state.get<boolean>(WATCHED.cleanFilter) === true ? CHANGE_FILTER : FILTER_OK
   }
 
   /**

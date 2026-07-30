@@ -28,7 +28,10 @@ function makeApi() {
     hap: { Service: {}, Characteristic: {}, uuid: { generate: (s: string) => `uuid-${s}` }, HapStatusError: class {} },
     user: { storagePath: () => '/tmp/hb' },
     on: (event: string, cb: () => void) => { handlers[event] = cb },
-    platformAccessory: class { constructor(public displayName: string, public UUID: string) { this.context = {} } context: Record<string, unknown> },
+    platformAccessory: class {
+      context: Record<string, unknown> = {}
+      constructor(public displayName: string, public UUID: string, public category?: number) {}
+    },
     registerPlatformAccessories: vi.fn(),
     unregisterPlatformAccessories: vi.fn(),
     updatePlatformAccessories: vi.fn(),
@@ -138,6 +141,29 @@ describe('actronAirNeoPlatform', () => {
     expect(stale.name).toBe('ActronAir Neo')
     expect(staleLonger.name).toBe('ActronAir Neo')
     expect(fan.name).toBe('ActronAir Neo Fan')
+  })
+
+  it('does not extend the filter-name exemption to accessories that own no filter service', async () => {
+    const api = makeApi()
+    const p = new ActronAirNeoPlatform(log, { platform: 'ActronAirNeo', name: 'x', refreshToken: 'rt' } as never, api)
+    const zone0 = restStatus.lastKnownState.RemoteZoneInfo[0]
+    const service = {
+      name: `${zone0.NV_Title} Filter`,
+      testCharacteristic: () => true,
+      getCharacteristic: () => ({ get value() { return service.name } }),
+      updateCharacteristic: (_id: unknown, value: string) => { service.name = value },
+    }
+    p.configureAccessory({
+      UUID: 'uuid-zone-0',
+      displayName: zone0.NV_Title,
+      context: { device: { kind: 'zone', zoneIndex: 0, id: 'zone-0' } },
+      services: [service],
+    } as never)
+    p.injectForTest({ getSystems: async () => systems, getStatus: async () => restStatus } as never)
+
+    await p.discoverDevices()
+
+    expect(service.name).toBe(zone0.NV_Title)
   })
 
   it('does not extend the fan-name exemption to accessories that own no fan service', async () => {

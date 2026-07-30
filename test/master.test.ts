@@ -92,6 +92,9 @@ const Characteristic = {
   CoolingThresholdTemperature: 'CoolingThresholdTemperature',
   RotationSpeed: 'RotationSpeed',
   ConfiguredName: 'ConfiguredName',
+  CurrentFanState: { INACTIVE: 0, IDLE: 1, BLOWING_AIR: 2 },
+  FilterChangeIndication: { FILTER_OK: 0, CHANGE_FILTER: 1 },
+  StatusActive: 'StatusActive',
 }
 
 const ServiceTokens = {
@@ -99,6 +102,7 @@ const ServiceTokens = {
   HeaterCooler: 'HeaterCooler',
   HumiditySensor: 'HumiditySensor',
   Fanv2: 'Fanv2',
+  FilterMaintenance: 'FilterMaintenance',
 }
 
 function baseTree() {
@@ -112,6 +116,7 @@ function baseTree() {
       EnabledZones: [],
     },
     MasterInfo: { LiveTemp_oC: 24, LiveHumidity_pc: 45 },
+    Alerts: { CleanFilter: false },
     LiveAircon: { CompressorMode: 'COOL', AmRunningFan: true },
     RemoteZoneInfo: [],
   }
@@ -194,8 +199,9 @@ function makeHarness(
   const master = new MasterAccessory(platform as never, accessory as never)
   const hvac = services.get(ServiceTokens.HeaterCooler)!
   const humidity = services.get(ServiceTokens.HumiditySensor)!
+  const filter = services.get(ServiceTokens.FilterMaintenance)!
 
-  return { state, commands, platform, master, hvac, humidity, services, removed }
+  return { state, commands, platform, master, hvac, humidity, filter, services, removed }
 }
 
 describe('masterAccessory', () => {
@@ -535,6 +541,101 @@ describe('masterAccessory', () => {
 
       expect(removed).toEqual([ServiceTokens.Fanv2])
       expect(services.has(ServiceTokens.Fanv2)).toBe(false)
+    })
+  })
+
+  describe('filter maintenance', () => {
+    it('reports the unit\'s own filter alert, and pushes it when the alert changes', () => {
+      const { state, master, filter } = makeHarness()
+      expect(master.getFilterChangeIndication()).toBe(Characteristic.FilterChangeIndication.FILTER_OK)
+      filter.updates.length = 0
+
+      state.applyDelta({ 'Alerts.CleanFilter': true })
+
+      expect(master.getFilterChangeIndication()).toBe(Characteristic.FilterChangeIndication.CHANGE_FILTER)
+      expect(filter.updates.some(
+        u => u.id === Characteristic.FilterChangeIndication && u.value === Characteristic.FilterChangeIndication.CHANGE_FILTER,
+      )).toBe(true)
+    })
+
+    it('reads OK when the unit reports no filter alert at all, rather than nagging about an unknown filter', () => {
+      const { state, master } = makeHarness()
+      state.replace({ ...baseTree(), Alerts: {} } as never)
+
+      expect(master.getFilterChangeIndication()).toBe(Characteristic.FilterChangeIndication.FILTER_OK)
+    })
+
+    it('names the filter service off the accessory, in both Name and ConfiguredName', () => {
+      const { filter } = makeHarness()
+
+      expect(filter.getCharacteristic(Characteristic.Name).value).toBe('Master Filter')
+      expect(filter.getCharacteristic(Characteristic.ConfiguredName).value).toBe('Master Filter')
+    })
+
+    it('keeps a filter ConfiguredName the Home app already holds', () => {
+      const { services } = makeHarness({}, {
+        cachedServices: [ServiceTokens.FilterMaintenance],
+        seedCached: service => service.setCharacteristic(Characteristic.ConfiguredName, 'Return Air Filter'),
+      })
+
+      expect(services.get(ServiceTokens.FilterMaintenance)!.getCharacteristic(Characteristic.ConfiguredName).value)
+        .toBe('Return Air Filter')
+    })
+
+    it('pushes the indication when the whole Alerts subtree appears, not just when the flag flips', () => {
+      // A subtree appearing reports the parent path; NeoState now also reports the leaves, and
+      // this is the accessory-level half of that contract.
+      const withoutAlerts = { ...baseTree() } as Record<string, unknown>
+      delete withoutAlerts.Alerts
+      const { state, filter } = makeHarness({}, { seed: false })
+      state.replace(withoutAlerts as never)
+      filter.updates.length = 0
+
+      state.replace({ ...baseTree(), Alerts: { CleanFilter: true } } as never)
+
+      expect(filter.updates.some(
+        u => u.id === Characteristic.FilterChangeIndication && u.value === Characteristic.FilterChangeIndication.CHANGE_FILTER,
+      )).toBe(true)
+    })
+  })
+
+  describe('sensor status', () => {
+    it('reports the fan idle while fan-only is selected but no air is moving', () => {
+      const { state, master } = makeHarness()
+      expect(master.getFanOnlyState()).toBe(Characteristic.CurrentFanState.INACTIVE)
+
+      state.applyDelta({ 'UserAirconSettings.Mode': 'FAN' })
+      expect(master.getFanOnlyState()).toBe(Characteristic.CurrentFanState.BLOWING_AIR)
+
+      state.applyDelta({ 'LiveAircon.AmRunningFan': false })
+      expect(master.getFanOnlyState()).toBe(Characteristic.CurrentFanState.IDLE)
+    })
+
+    it('pushes CurrentFanState for a power, mode or fan-running change', () => {
+      const { state, services } = makeHarness()
+      const fan = services.get(ServiceTokens.Fanv2)!
+
+      state.applyDelta({ 'UserAirconSettings.Mode': 'FAN' })
+      expect(fan.updates.some(u => u.id === Characteristic.CurrentFanState && u.value === Characteristic.CurrentFanState.BLOWING_AIR)).toBe(true)
+
+      fan.updates.length = 0
+      state.applyDelta({ 'LiveAircon.AmRunningFan': false })
+      expect(fan.updates.some(u => u.id === Characteristic.CurrentFanState && u.value === Characteristic.CurrentFanState.IDLE)).toBe(true)
+
+      fan.updates.length = 0
+      state.applyDelta({ 'UserAirconSettings.isOn': false })
+      expect(fan.updates.some(u => u.id === Characteristic.CurrentFanState && u.value === Characteristic.CurrentFanState.INACTIVE)).toBe(true)
+    })
+
+    it('marks the humidity sensor inactive once the reading stops being usable', () => {
+      const { state, humidity } = makeHarness()
+      expect(humidity.getCharacteristic(Characteristic.StatusActive).invokeGet()).toBe(true)
+
+      // 3000 is the cloud's "no reading" sentinel; getHumidity() keeps serving the last good 45.
+      state.applyDelta({ 'MasterInfo.LiveHumidity_pc': 3000 })
+
+      expect(humidity.getCharacteristic(Characteristic.StatusActive).invokeGet()).toBe(false)
+      expect(humidity.updates.some(u => u.id === Characteristic.StatusActive && u.value === false)).toBe(true)
     })
   })
 

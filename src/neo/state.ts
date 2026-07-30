@@ -184,9 +184,42 @@ function diffPaths(a: unknown, b: unknown, prefix = '', out = new Set<string>())
     return out
   }
 
-  if (a !== b && prefix)
+  if (a !== b && prefix) {
     out.add(prefix)
+    // One side is a container the other doesn't have — an optional subtree appearing or
+    // disappearing wholesale (`Alerts`, `LiveAircon.OutdoorUnit`, `UserAirconSettings.AfterHours`,
+    // `TurboMode`, a zone slot). The branches above can't recurse into `undefined`, so without
+    // this only the parent path is reported and every accessory watching a leaf beneath it
+    // (`Alerts.CleanFilter`, `...AmbientSensErr`, `AfterHours.Enabled`) silently misses the
+    // change and stays on its previous value. Emitting the leaves as well is what keeps a leaf
+    // watcher correct without every accessory having to also watch each ancestor path.
+    const container = isContainer(a) ? a : isContainer(b) ? b : undefined
+    if (container !== undefined)
+      addLeafPaths(container, prefix, out)
+  }
   return out
+}
+
+function isContainer(v: unknown): v is Record<string, unknown> | unknown[] {
+  return Array.isArray(v) || isPlainObject(v)
+}
+
+/**
+ * Adds every leaf path inside `node` (the container path itself is added by the caller). An
+ * empty container contributes no leaves, which is correct — the parent path already says it
+ * changed.
+ */
+function addLeafPaths(node: unknown, prefix: string, out: Set<string>): void {
+  if (Array.isArray(node)) {
+    node.forEach((value, index) => addLeafPaths(value, `${prefix}[${index}]`, out))
+    return
+  }
+  if (isPlainObject(node)) {
+    for (const [key, value] of Object.entries(node))
+      addLeafPaths(value, `${prefix}.${key}`, out)
+    return
+  }
+  out.add(prefix)
 }
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
