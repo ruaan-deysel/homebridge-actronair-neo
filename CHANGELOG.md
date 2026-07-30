@@ -5,6 +5,49 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-07-30
+
+### Added
+
+- **Fan-only mode is now reachable from HomeKit.** The ActronAir app offers Cool, Heat, Fan and
+  Auto, but HomeKit's Heater/Cooler has no fan-only target state, so `Fan` was the one mode the
+  plugin could not select. Units reporting `ModeSupport.Fan` now get a Fan service on the master
+  accessory: switching it on puts the system in fan-only mode (powering it up if it was off, in a
+  single atomic power+mode command so a mode picked in the same debounce window can't split it),
+  switching it off powers the system down, and its speed slider is the same fan speed as the
+  thermostat's. A unit that does not report fan support gets no Fan service, and a cached one is
+  removed. The tile carries its own `ConfiguredName` ("&lt;name&gt; Fan"), which is what the Home app
+  actually reads for a service since iOS 16 — with only `Name` set it would appear as a second
+  tile identical to the thermostat's. It is seeded once and never re-applied, so renaming the fan
+  in the Home app sticks across restarts.
+- Climate modes are now part of the detected capabilities and are logged at startup alongside
+  the model and fan speeds.
+
+### Fixed
+
+- The thermostat only offers the modes the unit reports supporting
+  (`UserAirconSettings.ModeSupport`). Previously Cool, Heat and Auto were always offered, so on
+  a unit lacking one of them the mode could be picked in the Home app and the resulting command
+  was acknowledged by the cloud and ignored by the hardware.
+- A system left in fan-only mode from the ActronAir app no longer reports a mode it isn't in.
+  The thermostat reported Auto (and logged a "Failed To Get Master Target Climate Mode"
+  debug line) because `FAN` matched none of its cases; it now holds its last real heat/cool/auto
+  target while the new Fan service carries the actual state, and never reports a mode HomeKit
+  was told to expect. Zone accessories in **Enable zone control** mode hold their target the same
+  way instead of flattening fan-only to Auto, so a zone tile no longer contradicts the master's.
+- The platform accessory's name from `config.json` is trimmed to what HAP accepts, the same way
+  zone names already were. It now seeds a second characteristic (the fan's `ConfiguredName`), so a
+  stray leading/trailing space would have produced two HAP warnings instead of none.
+- A service whose name an accessory derives from the accessory's own ("ActronAir Neo Fan") is no
+  longer reconciled away to the bare accessory name, which would have left two identically-named
+  tiles in the Home app. The exemption is limited to the accessory that owns such a service, so a
+  genuinely stale name — including one left over from a longer previous name — is still corrected.
+
+### Notes
+
+- Dry/dehumidify mode is still not exposed. No unit seen so far reports `ModeSupport.Dry` as
+  true, and HomeKit would need a separate Dehumidifier service for it.
+
 ## [1.0.1] - 2026-07-29
 
 ### Fixed

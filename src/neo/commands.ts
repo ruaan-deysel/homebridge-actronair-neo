@@ -14,6 +14,12 @@ export const commandBuilders: Record<string, Builder> = {
   [NeoCommand.CLIMATE_MODE_COOL]: () => set({ 'UserAirconSettings.Mode': 'COOL' }),
   [NeoCommand.CLIMATE_MODE_HEAT]: () => set({ 'UserAirconSettings.Mode': 'HEAT' }),
   [NeoCommand.CLIMATE_MODE_FAN]: () => set({ 'UserAirconSettings.Mode': 'FAN' }),
+  // Power and mode in a single set-settings, which the cloud accepts (see
+  // docs/actron_api_documentation.md, "Power and mode"). Deliberately one command rather than
+  // OFF-guarded ON + CLIMATE_MODE_FAN: those two would land on different debounce keys, so a
+  // mode change arriving in the same window could replace the FAN half — last write wins — and
+  // leave the power half to switch the unit on in whatever mode won.
+  [NeoCommand.FAN_ONLY_ON]: () => set({ 'UserAirconSettings.isOn': true, 'UserAirconSettings.Mode': 'FAN' }),
   [NeoCommand.FAN_MODE_AUTO]: () => set({ 'UserAirconSettings.FanMode': 'AUTO' }),
   [NeoCommand.FAN_MODE_AUTO_CONT]: () => set({ 'UserAirconSettings.FanMode': 'AUTO+CONT' }),
   [NeoCommand.FAN_MODE_LOW]: () => set({ 'UserAirconSettings.FanMode': 'LOW' }),
@@ -135,10 +141,13 @@ export class CommandQueue {
       case NeoCommand.ON:
       case NeoCommand.OFF:
         return 'power'
+      // FAN_ONLY_ON shares this key on purpose: it *is* a mode change (carrying power with it),
+      // so a thermostat mode picked in the same window must replace it wholesale, not race it.
       case NeoCommand.CLIMATE_MODE_AUTO:
       case NeoCommand.CLIMATE_MODE_COOL:
       case NeoCommand.CLIMATE_MODE_FAN:
       case NeoCommand.CLIMATE_MODE_HEAT:
+      case NeoCommand.FAN_ONLY_ON:
         return 'climateMode'
       case NeoCommand.FAN_MODE_AUTO:
       case NeoCommand.FAN_MODE_AUTO_CONT:

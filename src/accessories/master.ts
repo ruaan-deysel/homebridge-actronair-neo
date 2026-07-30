@@ -64,7 +64,23 @@ function clampToBounds(value: number | undefined, bounds: { min: number, max: nu
 export class MasterAccessory {
   private readonly hvacService: Service
   private readonly humidityService: Service
+  /**
+   * Fan-only mode. HomeKit's HeaterCooler has no target state for it (Off/Heat/Cool/Auto is
+   * the whole set), so a unit that reports ModeSupport.Fan gets a Fanv2 service alongside the
+   * thermostat instead — the mode is otherwise unreachable from the Home app, and a unit left
+   * in it from the ActronAir app showed up as whatever mode HomeKit last saw.
+   * Absent when the unit doesn't support fan-only.
+   */
+  private readonly fanOnlyService?: Service
   private readonly fanBands: FanBand[]
+  /** TargetHeaterCoolerState values this unit accepts — HAP rejects anything outside them. */
+  private readonly climateTargets: number[]
+  /**
+   * The heat/cool/auto target the thermostat last had. While the unit is in FAN mode there is
+   * no honest value to report (fan-only is neither heating nor cooling, and HAP has no state
+   * for it), so the thermostat holds this one and the Fanv2 service carries the truth.
+   */
+  private lastClimateTarget: number
   /** Effective setpoint range per mode, resolved from the device once at construction. */
   private heatBounds!: { min: number, max: number }
   private coolBounds!: { min: number, max: number }
@@ -108,7 +124,34 @@ export class MasterAccessory {
     this.hvacService.getCharacteristic(this.platform.Characteristic.CurrentHeaterCoolerState)
       .onGet(this.getCurrentCompressorMode.bind(this))
 
+    // Only offer the modes the unit reports. Without this a unit that can't heat (or can't run
+    // AUTO) still showed the mode in the Home app, and picking it sent a command the cloud
+    // acknowledged and the hardware ignored. AUTO first so it stays the value HAP defaults to.
+    const target = this.platform.Characteristic.TargetHeaterCoolerState
+    const modes = this.platform.capabilities?.modes
+    const reportedTargets = [
+      ...(modes?.auto ?? true ? [target.AUTO] : []),
+      ...(modes?.heat ?? true ? [target.HEAT] : []),
+      ...(modes?.cool ?? true ? [target.COOL] : []),
+    ]
+    // HAP needs at least one valid value or the characteristic — and with it the thermostat —
+    // is unusable, so a unit reporting no heating, cooling or auto at all (a fan-only head)
+    // still gets the full set rather than an empty list. Loudly, because every mode offered
+    // will then be one the hardware rejects: capabilities reports the device honestly and this
+    // is the one place that has to compromise.
+    if (reportedTargets.length === 0) {
+      this.platform.log.warn(
+        'This unit reports no cooling, heating or auto mode. HomeKit cannot show a thermostat without one, so all three are being offered — expect the unit to ignore them.',
+      )
+    }
+    this.climateTargets = reportedTargets.length ? reportedTargets : [target.AUTO, target.HEAT, target.COOL]
+    this.lastClimateTarget = this.climateTargets[0]
+
     this.hvacService.getCharacteristic(this.platform.Characteristic.TargetHeaterCoolerState)
+      .setProps({ validValues: this.climateTargets })
+      // As with the setpoints below: HAP's stored default (AUTO) is illegal on a unit that
+      // doesn't support it, and would warn on every startup unless a valid value is seeded.
+      .updateValue(this.getTargetClimateMode())
       .onGet(this.getTargetClimateMode.bind(this))
       .onSet(this.setTargetClimateMode.bind(this))
 
@@ -149,6 +192,45 @@ export class MasterAccessory {
       .onSet(this.setFanMode.bind(this))
       .onGet(this.getFanMode.bind(this))
 
+    const cachedFanOnly = this.accessory.getService(this.platform.Service.Fanv2)
+    if (modes?.fan ?? true) {
+      this.fanOnlyService = cachedFanOnly ?? this.accessory.addService(this.platform.Service.Fanv2)
+      const fanName = `${accessory.displayName} Fan`
+      this.fanOnlyService.setCharacteristic(this.platform.Characteristic.Name, fanName)
+
+      // `Name` alone is not enough for the Home app. Since iOS 16 it seeds each service's name
+      // from the *accessory* name and syncs per-service names through ConfiguredName, so without
+      // this the fan tile reads "ActronAir Neo" — indistinguishable from the thermostat beside
+      // it. Declared optional first because ConfiguredName isn't in Fanv2's HAP definition and
+      // getCharacteristic() would otherwise log a characteristic warning every startup.
+      //
+      // Seeded only when it has no value yet — on a fresh service, or on one cached from before
+      // this existed. Never re-set once it holds something: the Home app writes a user's rename
+      // back into this same characteristic, and re-applying it every startup is a well-trodden
+      // way to clobber their choice on every restart. That is also why a later rename in the
+      // plugin config moves `Name` but leaves an established ConfiguredName alone.
+      const configured = this.fanOnlyService.testCharacteristic(this.platform.Characteristic.ConfiguredName)
+      if (!configured)
+        this.fanOnlyService.addOptionalCharacteristic(this.platform.Characteristic.ConfiguredName)
+      if (!configured || !this.fanOnlyService.getCharacteristic(this.platform.Characteristic.ConfiguredName).value)
+        this.fanOnlyService.setCharacteristic(this.platform.Characteristic.ConfiguredName, fanName)
+
+      this.fanOnlyService.getCharacteristic(this.platform.Characteristic.Active)
+        .onGet(this.getFanOnlyActive.bind(this))
+        .onSet(this.setFanOnlyActive.bind(this))
+
+      // Same fan speed as the thermostat's slider, deliberately — there is one FanMode on the
+      // wire, and fan-only mode is where a user most wants to reach it.
+      this.fanOnlyService.getCharacteristic(this.platform.Characteristic.RotationSpeed)
+        .onGet(this.getFanMode.bind(this))
+        .onSet(this.setFanMode.bind(this))
+    }
+    else if (cachedFanOnly) {
+      // Cached from a run where the unit did report fan support (or from before this gate
+      // existed) — leaving it would show a fan tile that can't do anything.
+      this.accessory.removeService(cachedFanOnly)
+    }
+
     // Single poll loop lives on the platform now; this replaces the two setInterval timers.
     this.platform.state.onChange(changed => this.pushCharacteristics(changed))
   }
@@ -179,6 +261,13 @@ export class MasterAccessory {
 
     if (all || changed.has(WATCHED.power) || changed.has(WATCHED.compressorMode) || changed.has(WATCHED.fanRunning))
       this.hvacService.updateCharacteristic(this.platform.Characteristic.CurrentHeaterCoolerState, this.getCurrentCompressorMode())
+
+    if (this.fanOnlyService) {
+      if (all || changed.has(WATCHED.power) || changed.has(WATCHED.mode))
+        this.fanOnlyService.updateCharacteristic(this.platform.Characteristic.Active, this.getFanOnlyActive())
+      if (all || changed.has(WATCHED.fanMode))
+        this.fanOnlyService.updateCharacteristic(this.platform.Characteristic.RotationSpeed, this.getFanMode())
+    }
   }
 
   private checkHvacComms(): void {
@@ -256,24 +345,60 @@ export class MasterAccessory {
     this.platform.log.debug('Set Master Climate Mode -> ', value)
   }
 
+  /**
+   * FAN is deliberately not an error case: the unit really can be in fan-only mode, and the
+   * Fanv2 service reports it. The thermostat holds its previous target rather than inventing
+   * one — and never reports a mode `validValues` excludes, which HAP would reject outright.
+   */
   getTargetClimateMode(): CharacteristicValue {
-    let currentMode: number
+    const { AUTO, HEAT, COOL } = this.platform.Characteristic.TargetHeaterCoolerState
     const climateMode = this.platform.state.get<string>(WATCHED.mode)
-    switch (climateMode) {
-      case ClimateMode.AUTO:
-        currentMode = this.platform.Characteristic.TargetHeaterCoolerState.AUTO
-        break
-      case ClimateMode.HEAT:
-        currentMode = this.platform.Characteristic.TargetHeaterCoolerState.HEAT
-        break
-      case ClimateMode.COOL:
-        currentMode = this.platform.Characteristic.TargetHeaterCoolerState.COOL
-        break
-      default:
-        currentMode = 0
-        this.platform.log.debug('Failed To Get Master Target Climate Mode -> ', climateMode)
+    const mapped = climateMode === ClimateMode.AUTO
+      ? AUTO
+      : climateMode === ClimateMode.HEAT
+        ? HEAT
+        : climateMode === ClimateMode.COOL
+          ? COOL
+          : undefined
+
+    if (mapped !== undefined && this.climateTargets.includes(mapped))
+      this.lastClimateTarget = mapped
+    else if (climateMode !== ClimateMode.FAN)
+      this.platform.log.debug('Failed To Get Master Target Climate Mode -> ', climateMode)
+
+    return this.lastClimateTarget
+  }
+
+  /** Fan-only is on when the unit is running *and* in FAN mode — see fanOnlyService. */
+  getFanOnlyActive(): CharacteristicValue {
+    const { ACTIVE, INACTIVE } = this.platform.Characteristic.Active
+    return this.platform.state.get<boolean>(WATCHED.power)
+      && this.platform.state.get<string>(WATCHED.mode) === ClimateMode.FAN
+      ? ACTIVE
+      : INACTIVE
+  }
+
+  /**
+   * Turning fan-only on switches the unit to FAN mode and powers it up, in one command
+   * (`FAN_ONLY_ON`) — two separately debounced commands could be split by a mode change
+   * arriving in the same window, see its builder. Turning it off powers the unit down, because
+   * fan-only *is* the unit running: there is no fan to stop independently. Off while the unit
+   * is in some other mode is a no-op rather than a surprise shutdown.
+   */
+  async setFanOnlyActive(value: CharacteristicValue): Promise<void> {
+    this.checkHvacComms()
+    const on = Number(value) === this.platform.Characteristic.Active.ACTIVE
+
+    if (on) {
+      // Already running fan-only: nothing to send, and re-sending would cost a cloud write.
+      if (this.getFanOnlyActive() === this.platform.Characteristic.Active.ACTIVE)
+        return
+      assertCommandSuccess(this.platform, await this.platform.commands.run(NeoCommand.FAN_ONLY_ON))
     }
-    return currentMode
+    else if (this.platform.state.get<string>(WATCHED.mode) === ClimateMode.FAN) {
+      assertCommandSuccess(this.platform, await this.platform.commands.run(NeoCommand.OFF))
+    }
+    this.platform.log.debug('Set Master Fan-Only Mode -> ', on)
   }
 
   getCurrentTemperature(): CharacteristicValue {

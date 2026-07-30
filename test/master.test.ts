@@ -47,6 +47,15 @@ class FakeCharacteristic {
 class FakeService {
   characteristics = new Map<unknown, FakeCharacteristic>()
   updates: Array<{ id: unknown, value: unknown }> = []
+  declaredOptional: unknown[] = []
+
+  addOptionalCharacteristic(id: unknown) {
+    this.declaredOptional.push(id)
+  }
+
+  testCharacteristic(id: unknown) {
+    return this.characteristics.has(id)
+  }
 
   getCharacteristic(id: unknown) {
     let c = this.characteristics.get(id)
@@ -82,12 +91,14 @@ const Characteristic = {
   HeatingThresholdTemperature: 'HeatingThresholdTemperature',
   CoolingThresholdTemperature: 'CoolingThresholdTemperature',
   RotationSpeed: 'RotationSpeed',
+  ConfiguredName: 'ConfiguredName',
 }
 
 const ServiceTokens = {
   AccessoryInformation: 'AccessoryInformation',
   HeaterCooler: 'HeaterCooler',
   HumiditySensor: 'HumiditySensor',
+  Fanv2: 'Fanv2',
 }
 
 function baseTree() {
@@ -110,6 +121,7 @@ function baseTree() {
 function fullCapabilities(): NeoCapabilities {
   return {
     model: 'Test Unit',
+    modes: { cool: true, heat: true, auto: true, fan: true, dry: false },
     fanSpeeds: [FanMode.LOW, FanMode.MEDIUM, FanMode.HIGH, FanMode.AUTO],
     supportsAutoFan: true,
     supportsTurbo: false,
@@ -121,11 +133,15 @@ function fullCapabilities(): NeoCapabilities {
 
 function makeHarness(
   cfgOverrides: Record<string, unknown> = {},
-  { seed = true, capabilities = fullCapabilities(), limits }: {
+  { seed = true, capabilities = fullCapabilities(), limits, cachedServices = [], seedCached }: {
     seed?: boolean
     capabilities?: NeoCapabilities
     /** Device-reported NV_Limits.UserSetpoint_oC, as the owner's real hardware sends. */
     limits?: Record<string, number>
+    /** Services already on the cached accessory before construction. */
+    cachedServices?: string[]
+    /** Applied to each cached service before construction — e.g. a name HAP already stored. */
+    seedCached?: (service: FakeService) => void
   } = {},
 ) {
   const state = new NeoState()
@@ -137,6 +153,12 @@ function makeHarness(
 
   const services = new Map<string, FakeService>()
   services.set(ServiceTokens.AccessoryInformation, new FakeService())
+  for (const token of cachedServices) {
+    const cached = new FakeService()
+    seedCached?.(cached)
+    services.set(token, cached)
+  }
+  const removed: string[] = []
   const accessory = {
     displayName: 'Master',
     getService: (token: string) => services.get(token),
@@ -144,6 +166,14 @@ function makeHarness(
       const s = new FakeService()
       services.set(token, s)
       return s
+    },
+    removeService: (service: FakeService) => {
+      for (const [token, candidate] of services) {
+        if (candidate === service) {
+          services.delete(token)
+          removed.push(token)
+        }
+      }
     },
   }
 
@@ -165,7 +195,7 @@ function makeHarness(
   const hvac = services.get(ServiceTokens.HeaterCooler)!
   const humidity = services.get(ServiceTokens.HumiditySensor)!
 
-  return { state, commands, platform, master, hvac, humidity }
+  return { state, commands, platform, master, hvac, humidity, services, removed }
 }
 
 describe('masterAccessory', () => {
@@ -337,6 +367,175 @@ describe('masterAccessory', () => {
     expect(hvac.updates.some(u => u.id === Characteristic.CurrentTemperature && u.value === 24)).toBe(true)
     expect(hvac.updates.some(u => u.id === Characteristic.CurrentHeaterCoolerState && u.value === 3)).toBe(true)
     expect(humidity.updates.some(u => u.id === Characteristic.CurrentRelativeHumidity && u.value === 45)).toBe(true)
+  })
+
+  describe('climate mode capability gating', () => {
+    it('offers only the target states the unit reports supporting', () => {
+      const capabilities = { ...fullCapabilities(), modes: { cool: true, heat: false, auto: false, fan: true, dry: false } }
+      const { hvac } = makeHarness({}, { capabilities })
+
+      const target = hvac.getCharacteristic(Characteristic.TargetHeaterCoolerState)
+      expect(target.props.validValues).toEqual([Characteristic.TargetHeaterCoolerState.COOL])
+      // HAP's stored default is AUTO, which is illegal here — a legal value must be seeded.
+      expect(target.value).toBe(Characteristic.TargetHeaterCoolerState.COOL)
+    })
+
+    it('still offers a usable thermostat, with a warning, when the unit reports no heat/cool/auto at all', () => {
+      // HAP cannot accept an empty validValues list. capabilities reports the device honestly;
+      // this is the one place that has to compromise, and it must say so.
+      const capabilities = { ...fullCapabilities(), modes: { cool: false, heat: false, auto: false, fan: true, dry: false } }
+      const { hvac, platform } = makeHarness({}, { capabilities })
+
+      expect(hvac.getCharacteristic(Characteristic.TargetHeaterCoolerState).props.validValues).toHaveLength(3)
+      expect(platform.log.warn).toHaveBeenCalledWith(expect.stringMatching(/no cooling, heating or auto mode/i))
+    })
+
+    it('never reports a target state outside validValues, even if the device reports that mode', () => {
+      const capabilities = { ...fullCapabilities(), modes: { cool: true, heat: false, auto: true, fan: true, dry: false } }
+      const { state, master } = makeHarness({}, { capabilities })
+
+      state.applyDelta({ 'UserAirconSettings.Mode': 'HEAT' })
+
+      // Holds the last state HAP will accept (COOL, from the fixture) rather than reporting a
+      // HEAT that validValues excludes — HAP rejects that outright.
+      expect(master.getTargetClimateMode()).toBe(Characteristic.TargetHeaterCoolerState.COOL)
+    })
+  })
+
+  describe('fan-only mode', () => {
+    it('reports the Fanv2 service active only while the unit is on and in FAN mode', () => {
+      const { state, master } = makeHarness()
+      expect(master.getFanOnlyActive()).toBe(Characteristic.Active.INACTIVE)
+
+      state.applyDelta({ 'UserAirconSettings.Mode': 'FAN' })
+      expect(master.getFanOnlyActive()).toBe(Characteristic.Active.ACTIVE)
+
+      state.applyDelta({ 'UserAirconSettings.isOn': false })
+      expect(master.getFanOnlyActive()).toBe(Characteristic.Active.INACTIVE)
+    })
+
+    it('holds the last real target state (and logs nothing) while the unit is in FAN mode', () => {
+      const { state, master, platform } = makeHarness()
+      expect(master.getTargetClimateMode()).toBe(Characteristic.TargetHeaterCoolerState.COOL)
+
+      state.applyDelta({ 'UserAirconSettings.Mode': 'FAN' })
+
+      expect(master.getTargetClimateMode()).toBe(Characteristic.TargetHeaterCoolerState.COOL)
+      expect(platform.log.debug).not.toHaveBeenCalledWith(
+        expect.stringContaining('Failed To Get Master Target Climate Mode'),
+        expect.anything(),
+      )
+    })
+
+    it('still logs an unrecognised mode, so a genuinely unknown value is not swallowed', () => {
+      const { state, master, platform } = makeHarness()
+      state.applyDelta({ 'UserAirconSettings.Mode': 'NONSENSE' })
+
+      master.getTargetClimateMode()
+
+      expect(platform.log.debug).toHaveBeenCalledWith(
+        expect.stringContaining('Failed To Get Master Target Climate Mode'),
+        'NONSENSE',
+      )
+    })
+
+    it('switches to FAN mode and powers up in a single command, not two racing ones', async () => {
+      // Two commands (ON + CLIMATE_MODE_FAN) land on different debounce keys, so a thermostat
+      // mode arriving in the same window can replace the FAN half and the power half then
+      // switches the unit on in whatever mode won.
+      const { state, commands, master } = makeHarness()
+      state.applyDelta({ 'UserAirconSettings.isOn': false })
+
+      await master.setFanOnlyActive(Characteristic.Active.ACTIVE)
+
+      expect(commands.run).toHaveBeenCalledTimes(1)
+      expect(commands.run).toHaveBeenCalledWith(NeoCommand.FAN_ONLY_ON)
+    })
+
+    it('switches to FAN mode when the unit is already running in another mode', async () => {
+      const { commands, master } = makeHarness()
+
+      await master.setFanOnlyActive(Characteristic.Active.ACTIVE)
+
+      expect(commands.run).toHaveBeenCalledTimes(1)
+      expect(commands.run).toHaveBeenCalledWith(NeoCommand.FAN_ONLY_ON)
+    })
+
+    it('does not re-send the mode when the unit is already running fan-only', async () => {
+      const { state, commands, master } = makeHarness()
+      state.applyDelta({ 'UserAirconSettings.Mode': 'FAN' })
+
+      await master.setFanOnlyActive(Characteristic.Active.ACTIVE)
+
+      expect(commands.run).not.toHaveBeenCalled()
+    })
+
+    it('powers the unit off when fan-only is turned off', async () => {
+      const { state, commands, master } = makeHarness()
+      state.applyDelta({ 'UserAirconSettings.Mode': 'FAN' })
+
+      await master.setFanOnlyActive(Characteristic.Active.INACTIVE)
+
+      expect(commands.run).toHaveBeenCalledWith(NeoCommand.OFF)
+    })
+
+    it('ignores an off write while the unit is in another mode, instead of shutting it down', async () => {
+      // HomeKit sends Active=0 to the fan whenever the mode moves off FAN — treating that as
+      // "turn the system off" would kill a cool/heat cycle the user just started.
+      const { commands, master } = makeHarness()
+
+      await master.setFanOnlyActive(Characteristic.Active.INACTIVE)
+
+      expect(commands.run).not.toHaveBeenCalled()
+    })
+
+    it('pushes the Fanv2 characteristics when mode, power or fan speed change', () => {
+      const { state, services } = makeHarness()
+      const fan = services.get(ServiceTokens.Fanv2)!
+      fan.updates.length = 0
+
+      state.applyDelta({ 'UserAirconSettings.Mode': 'FAN' })
+      expect(fan.updates.some(u => u.id === Characteristic.Active && u.value === Characteristic.Active.ACTIVE)).toBe(true)
+
+      fan.updates.length = 0
+      state.applyDelta({ 'UserAirconSettings.FanMode': 'HIGH' })
+      expect(fan.updates.some(u => u.id === Characteristic.RotationSpeed && u.value === 90)).toBe(true)
+    })
+
+    it('gives the fan tile its own ConfiguredName, declared optional so HAP does not warn', () => {
+      // The Home app seeds a service's name from the accessory name and syncs per-service names
+      // through ConfiguredName (iOS 16+), so Name alone leaves the fan tile reading "Master".
+      const { services } = makeHarness()
+      const fan = services.get(ServiceTokens.Fanv2)!
+
+      expect(fan.getCharacteristic(Characteristic.ConfiguredName).value).toBe('Master Fan')
+      expect(fan.declaredOptional).toContain(Characteristic.ConfiguredName)
+    })
+
+    it('leaves a ConfiguredName the Home app already holds alone, rather than clobbering a rename', () => {
+      const { services } = makeHarness({}, {
+        cachedServices: [ServiceTokens.Fanv2],
+        seedCached: service => service.setCharacteristic(Characteristic.ConfiguredName, 'Lounge Breeze'),
+      })
+      const fan = services.get(ServiceTokens.Fanv2)!
+
+      expect(fan.getCharacteristic(Characteristic.ConfiguredName).value).toBe('Lounge Breeze')
+    })
+
+    it('seeds ConfiguredName on a fan service cached from before it was set, which would otherwise never get one', () => {
+      const { services } = makeHarness({}, { cachedServices: [ServiceTokens.Fanv2] })
+      const fan = services.get(ServiceTokens.Fanv2)!
+
+      expect(fan.getCharacteristic(Characteristic.ConfiguredName).value).toBe('Master Fan')
+    })
+
+    it('adds no fan service for a unit that does not support fan-only, and drops a cached one', () => {
+      const capabilities = { ...fullCapabilities(), modes: { cool: true, heat: true, auto: true, fan: false, dry: false } }
+      const { services, removed } = makeHarness({}, { capabilities, cachedServices: [ServiceTokens.Fanv2] })
+
+      expect(removed).toEqual([ServiceTokens.Fanv2])
+      expect(services.has(ServiceTokens.Fanv2)).toBe(false)
+    })
   })
 
   describe('fan speed capability gating (spec: task-20)', () => {

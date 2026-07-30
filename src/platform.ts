@@ -174,6 +174,7 @@ export class ActronAirNeoPlatform implements DynamicPlatformPlugin {
         `Detected ${this.capabilities.model}`
         + ` (indoor: ${this.capabilities.indoorModel ?? 'unknown'}, outdoor: ${this.capabilities.outdoorFamily ?? 'unknown'}`
         + `${this.capabilities.capacityKw ? `, ${this.capabilities.capacityKw}kW` : ''}).`
+        + ` Modes: ${Object.entries(this.capabilities.modes).filter(([, on]) => on).map(([mode]) => mode).join(', ')}.`
         + ` Fan speeds: ${this.capabilities.fanSpeeds.join(', ')}.`
         + ` Turbo: ${this.capabilities.supportsTurbo}, VFT: ${this.capabilities.supportsVft},`
         + ` quiet mode: ${this.capabilities.quietModeAvailable}, outdoor temp: ${this.capabilities.outdoorTempUsable}.`,
@@ -188,7 +189,9 @@ export class ActronAirNeoPlatform implements DynamicPlatformPlugin {
       this.startPush()
 
       discovered = [
-        { id: this.serial, displayName: this.cfg.name, kind: 'master' },
+        // Sanitised like a zone name: `name` is free text in config.json, and it now seeds the
+        // fan service's ConfiguredName as well as its own — HAP validates both.
+        { id: this.serial, displayName: sanitizeAccessoryName(this.cfg.name, 'ActronAir Neo'), kind: 'master' },
         { id: 'neo-away-mode', displayName: 'Away Mode', kind: 'away' },
         // Only registered when the unit reports QuietModeEnabled — see NeoCapabilities.
         ...(this.capabilities.quietModeAvailable
@@ -284,14 +287,25 @@ export class ActronAirNeoPlatform implements DynamicPlatformPlugin {
         // stale value in the Home app. Reconcile every service against displayName rather than
         // only when displayName itself just changed — once displayName has been corrected on an
         // earlier run, that condition is false while the service names are still wrong.
+        // Names a service is allowed to carry: the accessory's own, plus the ones an accessory
+        // deliberately derives from it — MasterAccessory's fan-only service is "<name> Fan",
+        // and reconciling that away would leave two identically-named tiles in the Home app.
+        // Exact names rather than a prefix test, and only for the accessory that actually owns
+        // such a service: either shortcut would exempt a genuinely stale name (a zone renamed
+        // "Study Fan" → "Study" keeps sub-services cached as "Study Fan"), which is the drift
+        // this loop exists to fix.
+        const allowedServiceNames = new Set([accessory.displayName])
+        if (device.kind === 'master')
+          allowedServiceNames.add(`${accessory.displayName} Fan`)
         let staleServiceName = false
         for (const service of accessory.services) {
           if (!service.testCharacteristic(this.Characteristic.Name))
             continue
-          if (service.getCharacteristic(this.Characteristic.Name).value !== accessory.displayName) {
-            service.updateCharacteristic(this.Characteristic.Name, accessory.displayName)
-            staleServiceName = true
-          }
+          const name = service.getCharacteristic(this.Characteristic.Name).value
+          if (typeof name === 'string' && allowedServiceNames.has(name))
+            continue
+          service.updateCharacteristic(this.Characteristic.Name, accessory.displayName)
+          staleServiceName = true
         }
         // Persist only on a real change; without the write the cache is rebuilt from the old
         // value on next shutdown, with it every restart would rewrite the cache for nothing.

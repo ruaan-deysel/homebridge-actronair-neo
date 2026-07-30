@@ -401,6 +401,20 @@ describe('zoneAccessory', () => {
     expect(activeChar.value).toBe(CharacteristicTypes.Active.INACTIVE)
   })
 
+  it('holds the last real target state when the master goes fan-only, instead of claiming AUTO', () => {
+    // Flattening FAN to AUTO made every zone tile contradict the master's own tile (which holds
+    // its last heat/cool/auto value), and claim a mode a unit without AUTO hasn't got.
+    const { platform, state } = makePlatform({ zonesAsHeaterCoolers: true })
+    state.applyDelta({ 'UserAirconSettings.Mode': 'COOL' })
+    void new ZoneAccessory(platform, accessory as never, 0)
+    const targetChar = accessory.getService(ServiceTypes.HeaterCooler)!
+      .getCharacteristic(CharacteristicTypes.TargetHeaterCoolerState)
+
+    state.applyDelta({ 'UserAirconSettings.Mode': 'FAN' })
+
+    expect(targetChar.value).toBe(CharacteristicTypes.TargetHeaterCoolerState.COOL)
+  })
+
   it('ignores deltas that belong to a different zone', () => {
     const { platform, state } = makePlatform({ zonesAsHeaterCoolers: true })
     void new ZoneAccessory(platform, accessory as never, 0)

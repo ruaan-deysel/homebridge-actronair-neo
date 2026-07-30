@@ -12,6 +12,8 @@ export interface NeoCapabilities {
   indoorModel?: string
   outdoorFamily?: string
   capacityKw?: number
+  /** Climate modes this unit will accept — see deriveModeSupport(). */
+  modes: NeoModeSupport
   /** Speeds this unit actually supports, in slider order (never empty). */
   fanSpeeds: FanMode[]
   supportsAutoFan: boolean
@@ -160,6 +162,47 @@ export function isTurboModeSupported(state: NeoState): boolean {
   return state.get<boolean>('UserAirconSettings.TurboMode.Supported') === true
 }
 
+/**
+ * Which of the controller's climate modes this unit will accept, from
+ * `UserAirconSettings.ModeSupport` — the same list the ActronAir app's Mode picker is built
+ * from (the owner's NTW-1000 reports Cool/Heat/Fan/Auto true, Dry false).
+ */
+export interface NeoModeSupport {
+  cool: boolean
+  heat: boolean
+  auto: boolean
+  /** Fan-only. HomeKit's HeaterCooler has no target state for it — see accessories/master.ts. */
+  fan: boolean
+  /** Dry/dehumidify. Reported false on every unit seen so far, and not exposed yet. */
+  dry: boolean
+}
+
+/**
+ * ModeSupport is authoritative when the unit reports it, per field: a mode it says it hasn't
+ * got is reported here as unsupported, full stop. Only an *absent* (or non-boolean) field
+ * falls back, to the four modes every Neo controller has always had — dry being the one
+ * genuinely optional mode, so its absence means "no" rather than being assumed.
+ *
+ * Deliberately no "at least one thermostat mode" clamp here. HAP does need a non-empty
+ * TargetHeaterCoolerState validValues list, but that is HAP's constraint, not the device's
+ * capability, and rewriting an honest all-false report into all-true here would have every
+ * other consumer believe in modes the hardware rejects. MasterAccessory handles the empty
+ * case at the HAP boundary where the reason lives.
+ */
+export function deriveModeSupport(state: NeoState): NeoModeSupport {
+  const reported = state.get<Record<string, unknown>>('UserAirconSettings.ModeSupport')
+  const supported = (key: string, fallback: boolean): boolean =>
+    typeof reported?.[key] === 'boolean' ? reported[key] as boolean : fallback
+
+  return {
+    cool: supported('Cool', true),
+    heat: supported('Heat', true),
+    auto: supported('Auto', true),
+    fan: supported('Fan', true),
+    dry: supported('Dry', false),
+  }
+}
+
 /** Bitmap bits for AirconSystem.IndoorUnit.NV_SupportedFanModes. */
 const FAN_BIT: Partial<Record<FanMode, number>> = {
   [FanMode.LOW]: 1,
@@ -228,6 +271,7 @@ export function deriveCapabilities(state: NeoState): NeoCapabilities {
     indoorModel,
     outdoorFamily: state.get<string>('AirconSystem.OutdoorUnit.Family'),
     capacityKw: state.get<number>('AirconSystem.OutdoorUnit.Capacity_kW'),
+    modes: deriveModeSupport(state),
     fanSpeeds,
     supportsAutoFan: fanSpeeds.includes(FanMode.AUTO),
     supportsTurbo: isTurboModeSupported(state),

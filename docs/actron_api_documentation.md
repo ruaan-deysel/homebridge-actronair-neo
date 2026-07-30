@@ -375,6 +375,10 @@ client working across models:
   `8=AUTO`. Absent, zero or unparseable is best treated as low/medium/high rather than no fan
   at all.
 - `AirconSystem.IndoorUnit.NV_AutoFanEnabled` — AUTO needs both the bit and this flag.
+- `UserAirconSettings.ModeSupport` — `{ Cool, Heat, Fan, Auto, Dry }` booleans, the same list
+  the app's Mode picker is built from. A real NTW-1000 reports all but `Dry`. Older firmware
+  omits the object entirely, in which case the four long-standing modes are the safe
+  assumption and `Dry` is not.
 - `UserAirconSettings.TurboMode.Supported`, `.QuietMode` support, VFT flags — feature gates.
 
 Firmware on at least one real unit reports `NV_SupportedFanModes: 3` (LOW+MED) while running

@@ -62,7 +62,7 @@ A Homebridge dynamic platform plugin for ActronAir Neo HVAC, talking to the Neo 
    `CommandResult`), `mqtt.ts` (`NeoMqtt`, the push transport — see mechanism 8 below),
    `certs.ts` (the MQTT broker's missing TLS intermediate).
 4. **`src/accessories/`** — HAP bindings: `master.ts` (`MasterAccessory`, one Heater/Cooler
-   + humidity sensor), `zone.ts` (`ZoneAccessory`, a Switch or, with `zonesAsHeaterCoolers`,
+   + humidity sensor + a Fanv2 for fan-only mode — see mechanism 9 below), `zone.ts` (`ZoneAccessory`, a Switch or, with `zonesAsHeaterCoolers`,
    its own Heater/Cooler + humidity + battery), `modeSwitch.ts` (`ModeSwitchAccessory`,
    shared by away/quiet/continuous-fan). All three read `platform.state` and write through
    `platform.commands`; none touch `NeoRest` directly.
@@ -156,3 +156,29 @@ A Homebridge dynamic platform plugin for ActronAir Neo HVAC, talking to the Neo 
    so `src/neo/certs.ts` supplies the missing intermediate (appended to
    `tls.rootCertificates`, never replacing it) and `servername` is set to a covered hostname —
    `rejectUnauthorized` stays `true` throughout.
+
+9. **Fan-only mode lives on a Fanv2 service, not the thermostat.** HomeKit's HeaterCooler has
+   exactly Off/Heat/Cool/Auto — there is no fan-only target state — so `ClimateMode.FAN` is
+   unreachable through `TargetHeaterCoolerState` no matter how it's mapped. `MasterAccessory`
+   therefore adds a Fanv2 alongside the HeaterCooler (only when
+   `UserAirconSettings.ModeSupport.Fan` says the unit has it), and while the unit is in FAN mode
+   `getTargetClimateMode()` *holds its previous* heat/cool/auto value rather than reporting one
+   the unit isn't in. That getter must also never return a value outside the `validValues` the
+   same constructor set from `ModeSupport` — HAP rejects it outright, which is why it filters
+   through `climateTargets` instead of trusting the device's `Mode` string. `deriveModeSupport()`
+   reports the device honestly, per field, including a unit that claims no cool/heat/auto at all;
+   HAP's "validValues can't be empty" compromise deliberately lives in the accessory (with a
+   warning) rather than being smuggled into the capability, where every other consumer would
+   then believe in modes the hardware rejects. Fanv2's `Active`
+   off-write powers the *system* down, because in fan-only mode the fan is the system running;
+   an off-write while the unit is in another mode is a deliberate no-op, since HomeKit sends one
+   every time the mode leaves FAN. The tile's name lives in **`ConfiguredName`**, not just `Name`:
+   since iOS 16 the Home app seeds a service's name from the *accessory* name and syncs per-service
+   names through `ConfiguredName`, so `Name` alone leaves a fan tile indistinguishable from the
+   thermostat next to it. It is declared via `addOptionalCharacteristic` first (it is not in
+   Fanv2's HAP definition, and `getCharacteristic` would log a characteristic warning every
+   startup otherwise) and seeded **only while empty** — the Home app writes a user's rename back
+   into that same characteristic, so re-applying it on every startup silently reverts their choice
+   on every restart. Checking for an empty value rather than "is the service new" is what also
+   gives a service cached from before this existed a name at all. Dry mode has no equivalent yet — no unit seen reports
+   `ModeSupport.Dry`.

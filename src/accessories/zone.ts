@@ -24,6 +24,8 @@ export class ZoneAccessory {
   /** Same rule for temperature/humidity — see getCurrentTemperature(). */
   private lastGoodTemp: number | undefined
   private lastGoodHumidity: number | undefined
+  /** Last heat/cool/auto the master reported — see getTargetHeaterCoolerState(). */
+  private lastTargetState: number | undefined
 
   private readonly paths: {
     name: string
@@ -128,6 +130,9 @@ export class ZoneAccessory {
 
       this.zoneService.getCharacteristic(this.platform.Characteristic.TargetHeaterCoolerState)
         .onGet(this.getTargetHeaterCoolerState.bind(this))
+      // Called once here for its side effect: it records the mode the system is in now, so a
+      // later switch into FAN has something real to hold instead of falling back to AUTO.
+      this.getTargetHeaterCoolerState()
 
       this.zoneService.getCharacteristic(this.platform.Characteristic.CurrentTemperature)
         .onGet(this.getCurrentTemperature.bind(this))
@@ -350,16 +355,26 @@ export class ZoneAccessory {
     return currentState
   }
 
+  /**
+   * Read-only mirror of the master's mode. FAN gets the same treatment MasterAccessory gives it
+   * — hold the last heat/cool/auto value — rather than being flattened to AUTO: fan-only is not
+   * "auto", and reporting it as such made every zone tile contradict the master's own tile the
+   * moment the system went fan-only.
+   */
   getTargetHeaterCoolerState(): CharacteristicValue {
-    const climateMode = this.platform.state.get<string>('UserAirconSettings.Mode')
-    switch (climateMode) {
+    const { AUTO, HEAT, COOL } = this.platform.Characteristic.TargetHeaterCoolerState
+    switch (this.platform.state.get<string>('UserAirconSettings.Mode')) {
       case ClimateMode.HEAT:
-        return this.platform.Characteristic.TargetHeaterCoolerState.HEAT
+        this.lastTargetState = HEAT
+        break
       case ClimateMode.COOL:
-        return this.platform.Characteristic.TargetHeaterCoolerState.COOL
-      default:
-        return this.platform.Characteristic.TargetHeaterCoolerState.AUTO
+        this.lastTargetState = COOL
+        break
+      case ClimateMode.AUTO:
+        this.lastTargetState = AUTO
+        break
     }
+    return this.lastTargetState ?? AUTO
   }
 
   getHeatingThresholdTemperature(): CharacteristicValue {

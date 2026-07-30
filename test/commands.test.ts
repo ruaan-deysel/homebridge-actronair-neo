@@ -41,6 +41,35 @@ describe('commandQueue', () => {
     expect(CommandQueue.commandKey(NeoCommand.ZONE_COOL_SET_POINT, 2)).toBe('zone:2:cool')
   })
 
+  it('sends fan-only-on as one atomic power+mode command on the climate-mode key', async () => {
+    // Split into ON + CLIMATE_MODE_FAN these would sit on different keys ('power' and
+    // 'climateMode'), so a thermostat mode picked in the same window replaces only the FAN half.
+    const { queue, sendCommand } = make()
+
+    expect(CommandQueue.commandKey(NeoCommand.FAN_ONLY_ON, 255)).toBe('climateMode')
+    expect(CommandQueue.commandKey(NeoCommand.CLIMATE_MODE_COOL, 255)).toBe('climateMode')
+
+    await queue.run(NeoCommand.FAN_ONLY_ON)
+
+    expect(sendCommand).toHaveBeenCalledTimes(1)
+    expect(sendCommand).toHaveBeenCalledWith('neo000000', {
+      command: { 'UserAirconSettings.isOn': true, 'UserAirconSettings.Mode': 'FAN', 'type': 'set-settings' },
+    })
+  })
+
+  it('lets a thermostat mode replace a pending fan-only-on rather than racing it', async () => {
+    const { queue, sendCommand } = make()
+
+    const fan = queue.run(NeoCommand.FAN_ONLY_ON)
+    const cool = queue.run(NeoCommand.CLIMATE_MODE_COOL)
+    await Promise.all([fan, cool])
+
+    expect(sendCommand).toHaveBeenCalledTimes(1)
+    expect(sendCommand).toHaveBeenCalledWith('neo000000', {
+      command: { 'UserAirconSettings.Mode': 'COOL', 'type': 'set-settings' },
+    })
+  })
+
   it('coalesces after-hours enable/disable and duration under independent keys', () => {
     expect(CommandQueue.commandKey(NeoCommand.AFTER_HOURS_ON, 255)).toBe('afterHoursEnabled')
     expect(CommandQueue.commandKey(NeoCommand.AFTER_HOURS_OFF, 255)).toBe('afterHoursEnabled')

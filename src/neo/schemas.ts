@@ -80,6 +80,15 @@ export const UserAirconSettingsSchema = z.looseObject({
   // Capability gate consumed by neo/capabilities.ts (NeoCapabilities.quietModeAvailable) —
   // distinct from QuietMode, which is the on/off state ModeSwitchAccessory reads/writes.
   QuietModeEnabled: z.boolean().optional(),
+  // Capability gate consumed by neo/capabilities.ts (deriveModeSupport) — which climate modes
+  // the unit will accept. Absent on older firmware, which is why every field is optional.
+  ModeSupport: z.looseObject({
+    Cool: z.boolean().optional(),
+    Heat: z.boolean().optional(),
+    Auto: z.boolean().optional(),
+    Fan: z.boolean().optional(),
+    Dry: z.boolean().optional(),
+  }).optional(),
 })
 
 /**

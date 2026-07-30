@@ -26,6 +26,8 @@ export enum NeoCommand {
   CLIMATE_MODE_AUTO = 'CLIMATE_MODE_AUTO',
   CLIMATE_MODE_COOL = 'CLIMATE_MODE_COOL',
   CLIMATE_MODE_FAN = 'CLIMATE_MODE_FAN',
+  /** Fan-only *and* power on, in one command — see commandBuilders. */
+  FAN_ONLY_ON = 'FAN_ONLY_ON',
   CLIMATE_MODE_HEAT = 'CLIMATE_MODE_HEAT',
   FAN_MODE_AUTO = 'FAN_MODE_AUTO',
   FAN_MODE_AUTO_CONT = 'FAN_MODE_AUTO_CONT',

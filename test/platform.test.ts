@@ -31,6 +31,7 @@ function makeApi() {
     platformAccessory: class { constructor(public displayName: string, public UUID: string) { this.context = {} } context: Record<string, unknown> },
     registerPlatformAccessories: vi.fn(),
     unregisterPlatformAccessories: vi.fn(),
+    updatePlatformAccessories: vi.fn(),
     handlers,
   } as never
 }
@@ -103,6 +104,65 @@ describe('actronAirNeoPlatform', () => {
       expect.any(String),
       [stale],
     )
+  })
+
+  it('fixes a stale service name but leaves a service that names itself off the accessory alone', async () => {
+    // The fan-only service is called "<accessory> Fan" on purpose (see MasterAccessory).
+    // Reconciling it to the bare display name left two identically-named tiles in the Home app.
+    const api = makeApi()
+    const p = new ActronAirNeoPlatform(log, { platform: 'ActronAirNeo', name: 'ActronAir Neo', refreshToken: 'rt' } as never, api)
+    const makeService = (name: string) => {
+      const service = {
+        name,
+        testCharacteristic: () => true,
+        getCharacteristic: () => ({ get value() { return service.name } }),
+        updateCharacteristic: (_id: unknown, value: string) => { service.name = value },
+      }
+      return service
+    }
+    const stale = makeService('Old Name')
+    const fan = makeService('ActronAir Neo Fan')
+    // Left over from a longer previous displayName. A prefix test would exempt this one too,
+    // which is the drift the reconcile exists to fix.
+    const staleLonger = makeService('ActronAir Neo Upstairs')
+    p.configureAccessory({
+      UUID: `uuid-${systems._embedded['ac-system'][0].serial}`,
+      displayName: 'ActronAir Neo',
+      context: {},
+      services: [stale, fan, staleLonger],
+    } as never)
+    p.injectForTest({ getSystems: async () => systems, getStatus: async () => restStatus } as never)
+
+    await p.discoverDevices()
+
+    expect(stale.name).toBe('ActronAir Neo')
+    expect(staleLonger.name).toBe('ActronAir Neo')
+    expect(fan.name).toBe('ActronAir Neo Fan')
+  })
+
+  it('does not extend the fan-name exemption to accessories that own no fan service', async () => {
+    // A zone renamed "Study Fan" → "Study" leaves its sub-services cached as "Study Fan".
+    // Only the master accessory has a service legitimately named "<name> Fan".
+    const api = makeApi()
+    const p = new ActronAirNeoPlatform(log, { platform: 'ActronAirNeo', name: 'x', refreshToken: 'rt' } as never, api)
+    const zone0 = restStatus.lastKnownState.RemoteZoneInfo[0]
+    const service = {
+      name: `${zone0.NV_Title} Fan`,
+      testCharacteristic: () => true,
+      getCharacteristic: () => ({ get value() { return service.name } }),
+      updateCharacteristic: (_id: unknown, value: string) => { service.name = value },
+    }
+    p.configureAccessory({
+      UUID: 'uuid-zone-0',
+      displayName: zone0.NV_Title,
+      context: { device: { kind: 'zone', zoneIndex: 0, id: 'zone-0' } },
+      services: [service],
+    } as never)
+    p.injectForTest({ getSystems: async () => systems, getStatus: async () => restStatus } as never)
+
+    await p.discoverDevices()
+
+    expect(service.name).toBe(zone0.NV_Title)
   })
 
   it('does not duplicate accessories on a second discovery', async () => {

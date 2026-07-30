@@ -23,11 +23,22 @@ The plugin exposes an ActronAir Neo system as HomeKit accessories through Homebr
 
 - The master controller as a Heater/Cooler accessory, reporting and setting mode, fan
   speed, temperature and humidity.
+- Fan-only mode as a Fan on the same accessory, when your unit supports it. HomeKit's
+  thermostat has no fan-only setting of its own (it offers Off, Cool, Heat and Auto only), so
+  the Fan is how you reach the ActronAir app's **Fan** mode. Turning it on switches the system
+  to fan-only — turning it off switches the system off, because in fan-only mode the fan *is*
+  the system running. Its speed slider is the same fan speed as the thermostat's.
 - Each configured zone, either as a simple on/off switch (default) or, with **Enable zone
   control** turned on, as its own accessory with independent temperature setpoints.
 - Away mode, Quiet mode, Continuous fan and Turbo mode as individual switches (each only
   when your unit reports support for it).
 - After Hours as a Valve accessory, with its run duration adjustable from the Home app.
+  This is the ActronAir controller's run-on timer: switch it on and the system runs for the
+  configured duration (30 minutes to 8 hours, the range the controller accepts) and then
+  stops, instead of running until something turns it off. It is a Valve because that is
+  HomeKit's "on for a set duration" accessory — the duration is under *Show Details* in the
+  Home app. It does not change temperature, fan speed or zones, and it is unrelated to
+  schedules.
 - The outdoor temperature as its own sensor, when your system reports a usable reading.
 
 Accessories are updated from the ActronAir cloud's live MQTT feed (~1 s) with REST polling
@@ -36,7 +47,7 @@ accessories stay consistent with each other without each one polling the cloud
 independently.
 
 The plugin auto-detects your ActronAir model and its reported capabilities on startup
-(fan speeds, Turbo, VFT, Quiet mode, outdoor temperature sensor) and only exposes the
+(climate modes, fan speeds, Turbo, VFT, Quiet mode, outdoor temperature sensor) and only exposes the
 accessories and options your unit actually supports — for example, the fan speed slider
 only offers the speeds your indoor unit reports, and switches for unsupported features
 simply aren't created. The detected model and capabilities are logged once at startup.

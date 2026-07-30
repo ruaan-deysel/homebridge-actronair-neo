@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { deriveCapabilities, getUsableOutdoorTemp, isTurboModeSupported } from '../src/neo/capabilities.js'
+import { deriveCapabilities, deriveModeSupport, getUsableOutdoorTemp, isTurboModeSupported } from '../src/neo/capabilities.js'
 import { StatusResponseSchema } from '../src/neo/schemas.js'
 import { NeoState } from '../src/neo/state.js'
 import { FanMode } from '../src/neo/types.js'
@@ -139,5 +139,43 @@ describe('deriveCapabilities', () => {
     const state = stateFrom(tree)
     expect(deriveCapabilities(state).supportsTurbo).toBe(true)
     expect(isTurboModeSupported(state)).toBe(true)
+  })
+})
+
+describe('deriveModeSupport', () => {
+  it('reads the owner\'s real fixture: cool/heat/fan/auto supported, dry not', () => {
+    const state = new NeoState()
+    state.replace(StatusResponseSchema.parse(realFixture).lastKnownState)
+
+    expect(deriveModeSupport(state)).toEqual({ cool: true, heat: true, auto: true, fan: true, dry: false })
+  })
+
+  it('assumes the four long-standing modes (but not dry) when the unit reports no ModeSupport', () => {
+    expect(deriveModeSupport(stateFrom(baseTree())))
+      .toEqual({ cool: true, heat: true, auto: true, fan: true, dry: false })
+  })
+
+  it('honours a mode the unit says it does not have', () => {
+    const tree = baseTree()
+    ;(tree.UserAirconSettings as Record<string, unknown>).ModeSupport = { Cool: true, Heat: false, Auto: false, Fan: false, Dry: false }
+
+    expect(deriveModeSupport(stateFrom(tree))).toEqual({ cool: true, heat: false, auto: false, fan: false, dry: false })
+  })
+
+  it('reports an all-false thermostat mode set honestly instead of rewriting it', () => {
+    // HAP does need a non-empty validValues list, but that compromise belongs to
+    // MasterAccessory — capabilities must not tell every other consumer the unit can cool.
+    const tree = baseTree()
+    ;(tree.UserAirconSettings as Record<string, unknown>).ModeSupport = { Cool: false, Heat: false, Auto: false, Fan: true }
+
+    expect(deriveModeSupport(stateFrom(tree))).toEqual({ cool: false, heat: false, auto: false, fan: true, dry: false })
+  })
+
+  it('falls back per field, so a partial ModeSupport does not lose the modes it omits', () => {
+    const tree = baseTree()
+    ;(tree.UserAirconSettings as Record<string, unknown>).ModeSupport = { Cool: false, Dry: true }
+
+    expect(deriveModeSupport(stateFrom(tree)))
+      .toEqual({ cool: false, heat: true, auto: true, fan: true, dry: true })
   })
 })
