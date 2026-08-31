@@ -46,10 +46,11 @@ function makeConnectImpl(clients: FakeClient[] = []) {
   return { impl, calls, clients }
 }
 
-function buildRest(getStatusImpl?: () => Promise<typeof restStatus>) {
+function buildRest(getStatusImpl?: () => Promise<typeof restStatus>, accountEmail = 'user@example.com') {
   return {
     getConnectionDetails: vi.fn(async () => CONNECTION_DETAILS),
     getStatus: vi.fn(getStatusImpl ?? (async () => restStatus)),
+    getAccount: vi.fn(async () => ({ email: accountEmail, id: 'user-1', fullName: 'User' })),
   }
 }
 
@@ -471,6 +472,51 @@ describe('neoMqtt', () => {
 
     expect(logMocks.warn).toHaveBeenCalledWith(expect.stringMatching(/object-valued/i))
 
+    mqtt.stop()
+  })
+
+  it('connects with user account email as username', async () => {
+    const state = new NeoState()
+    const rest = buildRest(undefined, 'testuser@example.com')
+    const { impl, calls } = makeConnectImpl()
+    const mqtt = new NeoMqtt({ rest: rest as never, auth: buildAuth() as never, state, serial: SERIAL, log, connectImpl: impl as never })
+
+    await mqtt.start()
+    expect(calls[0].opts.username).toBe('testuser@example.com')
+    mqtt.stop()
+  })
+
+  it('connects with userEmail from options when provided', async () => {
+    const state = new NeoState()
+    const rest = buildRest()
+    const { impl, calls } = makeConnectImpl()
+    const mqtt = new NeoMqtt({ rest: rest as never, auth: buildAuth() as never, state, serial: SERIAL, log, userEmail: 'custom@example.com', connectImpl: impl as never })
+
+    await mqtt.start()
+    expect(calls[0].opts.username).toBe('custom@example.com')
+    mqtt.stop()
+  })
+
+  it('applies unwrapped status-change delta payload', async () => {
+    const state = new NeoState()
+    state.replace(restStatus.lastKnownState)
+    const rest = buildRest()
+    const { impl, clients } = makeConnectImpl()
+    const mqtt = new NeoMqtt({ rest: rest as never, auth: buildAuth() as never, state, serial: SERIAL, log, connectImpl: impl as never })
+
+    await mqtt.start()
+    const client = clients[0]
+    client.emit('connect')
+    await vi.advanceTimersByTimeAsync(0)
+
+    const base = `actron-cloud/${CONNECTION_DETAILS.UserId}/neo/${SERIAL.toLowerCase()}/mwc`
+    client.emit('message', `${base}/status-change`, Buffer.from(JSON.stringify({
+      'UserAirconSettings.isOn': true,
+      'UserAirconSettings.Mode': 'HEAT',
+    })))
+
+    expect(state.get('UserAirconSettings.isOn')).toBe(true)
+    expect(state.get('UserAirconSettings.Mode')).toBe('HEAT')
     mqtt.stop()
   })
 })

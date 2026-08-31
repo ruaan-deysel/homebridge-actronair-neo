@@ -26,6 +26,8 @@ export interface NeoMqttOptions {
   state: NeoState
   serial: string
   log: Logging
+  /** User account email, sent as MQTT username so broker connections are identifiable on the broker. */
+  userEmail?: string
   /** Test seam — the real value is `mqtt.connect`; tests inject a fake client factory. */
   connectImpl?: typeof mqttPkg.connect
   /** Fires whenever `healthy` transitions, so the caller (platform.ts) can re-time its poll loop immediately instead of waiting for the next scheduled tick. */
@@ -115,11 +117,21 @@ export class NeoMqtt {
 
     let endpoint: { Endpoint: string, Port: number, UserId: string }
     let token: string
+    let email = this.opts.userEmail
     try {
-      [endpoint, token] = await Promise.all([
+      const tasks: [Promise<{ Endpoint: string, Port: number, UserId: string }>, Promise<string>, Promise<unknown>?] = [
         this.opts.rest.getConnectionDetails(),
         this.opts.auth.getAccessToken(),
-      ])
+      ]
+      if (!email) {
+        tasks.push(this.opts.rest.getAccount().then((acc) => {
+          if (acc.email)
+            email = acc.email.trim()
+        }).catch(() => undefined))
+      }
+      const [resEndpoint, resToken] = await Promise.all(tasks)
+      endpoint = resEndpoint as { Endpoint: string, Port: number, UserId: string }
+      token = resToken as string
     }
     catch (error) {
       this.opts.log.debug(`MQTT push unavailable (broker discovery/auth failed), keeping to REST polling: ${(error as Error).message}`)
@@ -135,7 +147,7 @@ export class NeoMqtt {
     let client: MqttClient
     try {
       client = this.connectImpl(`mqtts://${endpoint.Endpoint}:${endpoint.Port}`, {
-        username: '',
+        username: email ?? '',
         password: token,
         clientId: `homebridge-actronair-neo-${randomUUID()}`,
         clean: true,

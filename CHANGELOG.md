@@ -5,6 +5,26 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1] - 2026-08-31
+
+### Changed
+
+- **MQTT broker connection identity.** Realtime MQTT push connections now authenticate with the
+  account email as the MQTT username (resolved dynamically from the linked account), allowing
+  connections to be attributable on the ActronAir broker.
+
+### Fixed
+
+- **Resilient connection details parsing.** Realtime connection detail responses with alternate
+  payload structures (`RTCDetails`/`rtcDetails` envelopes, camelCase/lowercase property names,
+  or omitted ports/protocols) are now parsed seamlessly with sensible defaults.
+- **Tolerant status-change and full-status payloads.** Push updates delivered at the root or under
+  `lastKnownState` (in addition to `event`) are parsed cleanly, and broadcast metadata keys
+  (`serial`, `isOnline`, `wcFirmware`) are skipped without causing delta rejections.
+- **String field numeric coercion.** Identifiers and string fields (such as `SoftwareVersion`,
+  `SerialNumber`, `Designator`, `MasterWCModel`, and zone names) now coerce numeric inputs from
+  firmware without rejecting delta updates.
+
 ## [1.2.0] - 2026-07-30
 
 ### Added
@@ -194,5 +214,8 @@ First release of **homebridge-actronair-neo**.
   plugin settings page; there is no username or password setting, and nothing to configure by
   hand.
 
+[1.2.1]: https://github.com/ruaan-deysel/homebridge-actronair-neo/releases/tag/v1.2.1
+[1.2.0]: https://github.com/ruaan-deysel/homebridge-actronair-neo/releases/tag/v1.2.0
+[1.1.0]: https://github.com/ruaan-deysel/homebridge-actronair-neo/releases/tag/v1.1.0
 [1.0.1]: https://github.com/ruaan-deysel/homebridge-actronair-neo/releases/tag/v1.0.1
 [1.0.0]: https://github.com/ruaan-deysel/homebridge-actronair-neo/releases/tag/v1.0.0

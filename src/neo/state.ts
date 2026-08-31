@@ -5,7 +5,7 @@ import { validateDeltaValue } from './schemas.js'
 export type ChangeListener = (changedPaths: Set<string>) => void
 
 /** Delta keys that are metadata, not state. */
-const DELTA_METADATA_KEYS = new Set(['type'])
+const DELTA_METADATA_KEYS = new Set(['type', 'serial', 'isOnline', 'wcFirmware'])
 
 /** Why a single path/value pair in a delta was not applied. */
 export interface DeltaRejection {

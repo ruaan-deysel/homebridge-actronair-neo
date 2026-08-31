@@ -180,4 +180,63 @@ describe('absent-numeric sentinels on coerced fields', () => {
     expect(validateDeltaValue('RemoteZoneInfo[2].LiveTemp_oC', 'NA')).toEqual({ ok: true, value: undefined })
     expect(validateDeltaValue('MasterInfo.LiveOutdoorTemp_oC', '19')).toEqual({ ok: true, value: 19 })
   })
+
+  it('coerces numeric values to string for string delta paths', () => {
+    expect(validateDeltaValue('AirconSystem.Peripherals[0].SerialNumber', 12345)).toEqual({ ok: true, value: '12345' })
+    expect(validateDeltaValue('AirconSystem.Sensors[0].Designator', 1)).toEqual({ ok: true, value: '1' })
+    expect(validateDeltaValue('RemoteZoneInfo[0].NV_Title', 101)).toEqual({ ok: true, value: '101' })
+  })
+
+  it('parses connection details with RTCDetails envelope and camelCase keys', () => {
+    const wrapped = {
+      RTCDetails: {
+        endpoint: 'broker.example.com',
+        port: '8883',
+        protocol: 'ssl',
+        userId: 'user-123',
+      },
+    }
+    const parsed = ConnectionDetailsSchema.parse(wrapped)
+    expect(parsed.Endpoint).toBe('broker.example.com')
+    expect(parsed.Port).toBe(8883)
+    expect(parsed.Protocol).toBe('ssl')
+    expect(parsed.UserId).toBe('user-123')
+  })
+
+  it('parses connection details with defaults for missing optional port and protocol', () => {
+    const minimal = {
+      endpoint: 'broker.minimal.com',
+      userId: 'user-min',
+    }
+    const parsed = ConnectionDetailsSchema.parse(minimal)
+    expect(parsed.Endpoint).toBe('broker.minimal.com')
+    expect(parsed.Port).toBe(8883)
+    expect(parsed.Protocol).toBe('TLS')
+    expect(parsed.UserId).toBe('user-min')
+  })
+
+  it('fails validation when UserId is missing from connection details', () => {
+    const missingUser = {
+      endpoint: 'broker.minimal.com',
+    }
+    expect(() => ConnectionDetailsSchema.parse(missingUser)).toThrow(/UserId/)
+  })
+
+  it('unwraps full-status when payload is nested under lastKnownState or provided directly', () => {
+    const raw = fixture('rest-status')
+    const parsedLastKnown = FullStatusPushSchema.parse(raw)
+    expect(parsedLastKnown.event.UserAirconSettings).toBeDefined()
+
+    const parsedDirect = FullStatusPushSchema.parse(raw.lastKnownState)
+    expect(parsedDirect.event.UserAirconSettings).toBeDefined()
+  })
+
+  it('unwraps status-change when deltas are at root of payload', () => {
+    const directDeltas = {
+      'UserAirconSettings.isOn': true,
+      'RemoteZoneInfo[0].ZonePosition': 100,
+    }
+    const parsed = StatusChangeSchema.parse(directDeltas)
+    expect(parsed.event['UserAirconSettings.isOn']).toBe(true)
+  })
 })

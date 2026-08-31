@@ -295,7 +295,7 @@ Note the **PascalCase** keys, and that `Port` is a **string**, not a number.
 
 ### Connecting
 
-- `username`: empty string. `password`: the OAuth **access token**.
+- `username`: account email (e.g. `user@example.com`, or empty string fallback) so broker connections are attributable to the user's account. `password`: the OAuth **access token**.
 - MQTT 3.1.1, keepalive 60.
 - A **fresh random client id with `clean: true` on every connect.** There is no session worth
   resuming — every message is either a snapshot or covered by a REST resync — and a stable id

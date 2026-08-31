@@ -189,17 +189,33 @@ export const StatusResponseSchema = z.looseObject({
   lastKnownState: StatusTreeSchema,
 })
 
-/** MQTT full-status — same tree, but nested under `event` rather than `lastKnownState`. */
-export const FullStatusPushSchema = z.looseObject({
+/** MQTT full-status — same tree, nested under `event`, `lastKnownState`, or at the root. */
+export const FullStatusPushSchema = z.preprocess((val) => {
+  if (typeof val !== 'object' || val === null)
+    return val
+  const obj = val as Record<string, unknown>
+  if (typeof obj.event === 'object' && obj.event !== null)
+    return obj
+  if (typeof obj.lastKnownState === 'object' && obj.lastKnownState !== null)
+    return { event: obj.lastKnownState, wcFirmware: obj.wcFirmware }
+  return { event: obj, wcFirmware: obj.wcFirmware }
+}, z.looseObject({
   event: StatusTreeSchema,
   wcFirmware: z.string().optional(),
-})
+}))
 
-/** MQTT status-change — a flat delta of dotted/bracketed paths, not a snapshot. */
-export const StatusChangeSchema = z.looseObject({
+/** MQTT status-change — a flat delta of dotted/bracketed paths, nested under `event` or at the root. */
+export const StatusChangeSchema = z.preprocess((val) => {
+  if (typeof val !== 'object' || val === null)
+    return val
+  const obj = val as Record<string, unknown>
+  if (typeof obj.event === 'object' && obj.event !== null)
+    return obj
+  return { event: obj, wcFirmware: obj.wcFirmware }
+}, z.looseObject({
   event: z.record(z.string(), z.unknown()),
   wcFirmware: z.string().optional(),
-})
+}))
 
 /**
  * The MQTT delta boundary: `NeoState.applyDelta()` (state.ts) only ever writes a path/value
@@ -238,17 +254,17 @@ const ALLOWED_DELTA_PATHS: Record<string, z.ZodTypeAny> = {
   'UserAirconSettings.VFT.Supported': z.boolean(),
   'UserAirconSettings.QuietModeEnabled': z.boolean(),
 
-  'AirconSystem.MasterWCModel': z.string(),
-  'AirconSystem.IndoorUnit.NV_ModelNumber': z.string(),
+  'AirconSystem.MasterWCModel': z.coerce.string(),
+  'AirconSystem.IndoorUnit.NV_ModelNumber': z.coerce.string(),
   'AirconSystem.IndoorUnit.NV_SupportedFanModes': numeric,
   'AirconSystem.IndoorUnit.NV_AutoFanEnabled': z.boolean(),
-  'AirconSystem.OutdoorUnit.Family': z.string(),
+  'AirconSystem.OutdoorUnit.Family': z.coerce.string(),
   'AirconSystem.OutdoorUnit.Capacity_kW': numeric,
-  'AirconSystem.Peripherals[].SerialNumber': z.string(),
-  'AirconSystem.Peripherals[].ConnectionState': z.string(),
+  'AirconSystem.Peripherals[].SerialNumber': z.coerce.string(),
+  'AirconSystem.Peripherals[].ConnectionState': z.coerce.string(),
   'AirconSystem.Peripherals[].RemainingBatteryCapacity_pc': numeric,
   'AirconSystem.Peripherals[].RSSI.Local': numeric,
-  'AirconSystem.Sensors[].Designator': z.string(),
+  'AirconSystem.Sensors[].Designator': z.coerce.string(),
   'AirconSystem.Sensors[].Detected': z.boolean(),
 
   'NV_Limits.UserSetpoint_oC.setCool_Min': numeric,
@@ -271,7 +287,7 @@ const ALLOWED_DELTA_PATHS: Record<string, z.ZodTypeAny> = {
   'LiveAircon.OutdoorUnit.AmbientSensErr': z.boolean(),
 
   'RemoteZoneInfo[].NV_Exists': z.boolean(),
-  'RemoteZoneInfo[].NV_Title': z.string(),
+  'RemoteZoneInfo[].NV_Title': z.coerce.string(),
   'RemoteZoneInfo[].LiveTemp_oC': numeric,
   'RemoteZoneInfo[].LiveHumidity_pc': numeric,
   'RemoteZoneInfo[].MaxHeatSetpoint': numeric,
@@ -311,13 +327,38 @@ export function validateDeltaValue(path: string, value: unknown): DeltaValidatio
   return { ok: true, value: parsed.data }
 }
 
-/** GET /api/v0/messaging/connection/details — PascalCase keys, Port arrives as a string. */
-export const ConnectionDetailsSchema = z.looseObject({
-  Endpoint: z.string(),
-  Port: z.coerce.number().int().positive(),
-  Protocol: z.string(),
-  UserId: z.string(),
-})
+/**
+ * GET /api/v0/messaging/connection/details.
+ * Handles PascalCase, camelCase, lowercase, and optional `RTCDetails` envelope wrapper.
+ */
+export const ConnectionDetailsSchema = z.preprocess((val) => {
+  if (typeof val !== 'object' || val === null)
+    return val
+
+  const obj = val as Record<string, unknown>
+  const candidate = (typeof obj.RTCDetails === 'object' && obj.RTCDetails !== null)
+    ? obj.RTCDetails as Record<string, unknown>
+    : (typeof obj.rtcDetails === 'object' && obj.rtcDetails !== null)
+        ? obj.rtcDetails as Record<string, unknown>
+        : obj
+
+  const endpoint = candidate.Endpoint ?? candidate.endpoint ?? candidate.endPoint ?? candidate.host ?? candidate.server
+  const port = candidate.Port ?? candidate.port ?? 8883
+  const protocol = candidate.Protocol ?? candidate.protocol ?? candidate.scheme ?? 'TLS'
+  const userId = candidate.UserId ?? candidate.userId ?? candidate.user_id ?? candidate.username
+
+  return {
+    Endpoint: endpoint === undefined || endpoint === null ? undefined : String(endpoint).trim(),
+    Port: port,
+    Protocol: protocol === undefined || protocol === null ? 'TLS' : String(protocol).trim(),
+    UserId: userId === undefined || userId === null ? undefined : String(userId).trim(),
+  }
+}, z.looseObject({
+  Endpoint: z.string().min(1),
+  Port: z.coerce.number().int().positive().default(8883),
+  Protocol: z.string().min(1).default('TLS'),
+  UserId: z.string().min(1),
+}))
 
 export const AcSystemsSchema = z.looseObject({
   _embedded: z.object({
