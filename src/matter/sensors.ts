@@ -34,13 +34,11 @@ export function buildOutdoorTempMatterAccessory(
       const all = changed.has('*')
       if (all || changed.has('MasterInfo.LiveOutdoorTemp_oC') || changed.has('LiveAircon.OutdoorUnit.AmbientSensErr')) {
         const temp = getUsableOutdoorTemp(platform.state)
-        if (temp !== undefined) {
-          platform.api.matter?.updateAccessoryState(uuid, 'temperatureMeasurement', {
-            measuredValue: Math.round(temp * 100),
-          }).catch((err) => {
-            platform.log.debug(`Failed to update Matter outdoor temperature state: ${(err as Error).message}`)
-          })
-        }
+        platform.api.matter?.updateAccessoryState(uuid, 'temperatureMeasurement', {
+          measuredValue: temp !== undefined ? Math.round(temp * 100) : null,
+        }).catch((err) => {
+          platform.log.debug(`Failed to update Matter outdoor temperature state: ${(err as Error).message}`)
+        })
       }
     },
   }

@@ -206,17 +206,17 @@ export function buildMasterMatterAccessory(
               break
             case MatterSystemMode.Auto:
               if (!isOn)
-                await platform.commands.run(NeoCommand.ON)
+                assertMatterCommandSuccess(platform, await platform.commands.run(NeoCommand.ON))
               assertMatterCommandSuccess(platform, await platform.commands.run(NeoCommand.CLIMATE_MODE_AUTO))
               break
             case MatterSystemMode.Cool:
               if (!isOn)
-                await platform.commands.run(NeoCommand.ON)
+                assertMatterCommandSuccess(platform, await platform.commands.run(NeoCommand.ON))
               assertMatterCommandSuccess(platform, await platform.commands.run(NeoCommand.CLIMATE_MODE_COOL))
               break
             case MatterSystemMode.Heat:
               if (!isOn)
-                await platform.commands.run(NeoCommand.ON)
+                assertMatterCommandSuccess(platform, await platform.commands.run(NeoCommand.ON))
               assertMatterCommandSuccess(platform, await platform.commands.run(NeoCommand.CLIMATE_MODE_HEAT))
               break
             case MatterSystemMode.FanOnly:

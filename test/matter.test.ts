@@ -145,6 +145,22 @@ describe('matter layer', () => {
       expect(commands.run).toHaveBeenCalledWith(NeoCommand.FAN_ONLY_ON)
     })
 
+    it('fails system mode changes if power-on command fails while off', async () => {
+      const { platform, commands } = makePlatform()
+      platform.state.applyDelta({ 'UserAirconSettings.isOn': false })
+      commands.run.mockResolvedValueOnce(CommandResult.FAILURE)
+
+      const { accessory } = buildMasterMatterAccessory(platform, {
+        id: 'NEO123456',
+        displayName: 'Air Conditioner',
+        kind: 'master',
+      })
+
+      await expect(accessory.handlers!.thermostat!.systemModeChange!({ systemMode: 3 })).rejects.toThrow('Command failed to apply')
+      expect(commands.run).toHaveBeenCalledTimes(1)
+      expect(commands.run).toHaveBeenCalledWith(NeoCommand.ON)
+    })
+
     it('handles heating and cooling setpoint changes', async () => {
       const { platform, commands } = makePlatform()
       const { accessory } = buildMasterMatterAccessory(platform, {
@@ -381,6 +397,17 @@ describe('matter layer', () => {
         binding.uuid,
         'temperatureMeasurement',
         { measuredValue: 2000 },
+      )
+
+      platform.state.applyDelta({
+        'MasterInfo.LiveOutdoorTemp_oC': 3000,
+        'LiveAircon.OutdoorUnit.AmbientSensErr': true,
+      })
+      binding.update(new Set(['MasterInfo.LiveOutdoorTemp_oC', 'LiveAircon.OutdoorUnit.AmbientSensErr']))
+      expect(platform.api.matter?.updateAccessoryState).toHaveBeenLastCalledWith(
+        binding.uuid,
+        'temperatureMeasurement',
+        { measuredValue: null },
       )
     })
   })
