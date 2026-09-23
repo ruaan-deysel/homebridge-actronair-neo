@@ -913,6 +913,58 @@ describe('actronAirNeoPlatform', () => {
       expect(api.registerPlatformAccessories).toHaveBeenCalled()
       expect(log.error).toHaveBeenCalledWith('Matter accessory sync failed: Matter daemon crashed')
     })
+
+    it('catches async errors thrown in matterBindings update during state changes', async () => {
+      const api = makeApi({ matterEnabled: true })
+      const p = new ActronAirNeoPlatform(log, { platform: 'ActronAirNeo', name: 'x', refreshToken: 'rt' } as never, api)
+      p.state.replace(restStatus.lastKnownState as never)
+
+      const rejectedBinding = {
+        uuid: 'test-uuid',
+        accessory: { displayName: 'Async Failing Accessory' },
+        update: vi.fn().mockRejectedValue(new Error('Async update explosion')),
+      }
+      p.matterBindings.set('test-uuid', rejectedBinding as never)
+
+      log.error.mockClear()
+      p.state.applyDelta({ 'UserAirconSettings.isOn': true })
+      await new Promise(r => setTimeout(r, 0))
+
+      expect(log.error).toHaveBeenCalledWith('Failed to update Matter accessory "Async Failing Accessory": Async update explosion')
+    })
+
+    it('does not unregister cached Matter accessories when build throws for a discovered device', async () => {
+      const api = makeApi({ matterEnabled: true })
+      const p = new ActronAirNeoPlatform(log, { platform: 'ActronAirNeo', name: 'x', refreshToken: 'rt' } as never, api)
+
+      const cachedMaster = {
+        UUID: 'matter-uuid-matter:neo000000',
+        displayName: 'ActronAir Neo',
+        context: {},
+      } as never
+      p.configureMatterAccessory(cachedMaster)
+
+      p.injectForTest({
+        getSystems: async () => systems,
+        getStatus: async () => restStatus,
+      } as never)
+
+      const mapping = await import('../src/matter/mapping.js')
+      const spy = vi.spyOn(mapping, 'buildMatterAccessory').mockImplementation(() => {
+        throw new Error('Transient build error')
+      })
+
+      try {
+        await p.discoverDevices()
+      }
+      finally {
+        spy.mockRestore()
+      }
+
+      // Cached accessory must NOT be unregistered because its identity was reserved in wanted
+      expect(api.matter.unregisterPlatformAccessories).not.toHaveBeenCalled()
+      expect(p.matterAccessories.has('matter-uuid-matter:neo000000')).toBe(true)
+    })
   })
 })
 

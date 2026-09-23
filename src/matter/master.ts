@@ -111,6 +111,9 @@ export function buildMasterMatterAccessory(
           }
           let cmd: NeoCommand
           switch (fanMode) {
+            case MatterFanMode.Off:
+              cmd = NeoCommand.OFF
+              break
             case MatterFanMode.Low:
               cmd = NeoCommand.FAN_MODE_LOW
               break
@@ -133,7 +136,10 @@ export function buildMasterMatterAccessory(
             throw new Error('ActronAir Master Controller is offline')
           }
           let cmd: NeoCommand
-          if (percentSetting === null || percentSetting === undefined || percentSetting === 0) {
+          if (percentSetting === 0) {
+            cmd = NeoCommand.OFF
+          }
+          else if (percentSetting === null || percentSetting === undefined) {
             cmd = NeoCommand.FAN_MODE_AUTO
           }
           else if (percentSetting <= 33) {

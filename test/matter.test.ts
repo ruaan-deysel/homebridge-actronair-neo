@@ -145,6 +145,21 @@ describe('matter layer', () => {
       expect(commands.run).toHaveBeenCalledWith(NeoCommand.FAN_ONLY_ON)
     })
 
+    it('turns system on first when switching mode while off', async () => {
+      const { platform, commands } = makePlatform()
+      platform.state.applyDelta({ 'UserAirconSettings.isOn': false })
+      const { accessory } = buildMasterMatterAccessory(platform, {
+        id: 'NEO123456',
+        displayName: 'Air Conditioner',
+        kind: 'master',
+      })
+
+      const handlers = accessory.handlers!.thermostat!
+      await handlers.systemModeChange!({ systemMode: 3 /* Cool */ })
+      expect(commands.run).toHaveBeenNthCalledWith(1, NeoCommand.ON)
+      expect(commands.run).toHaveBeenNthCalledWith(2, NeoCommand.CLIMATE_MODE_COOL)
+    })
+
     it('fails system mode changes if power-on command fails while off', async () => {
       const { platform, commands } = makePlatform()
       platform.state.applyDelta({ 'UserAirconSettings.isOn': false })
@@ -203,6 +218,9 @@ describe('matter layer', () => {
       await handlers.fanModeChange!({ fanMode: 5 /* Auto */ })
       expect(commands.run).toHaveBeenCalledWith(NeoCommand.FAN_MODE_AUTO)
 
+      await handlers.fanModeChange!({ fanMode: 0 /* Off */ })
+      expect(commands.run).toHaveBeenCalledWith(NeoCommand.OFF)
+
       // Percent settings
       await handlers.percentSettingChange!({ percentSetting: 25 })
       expect(commands.run).toHaveBeenCalledWith(NeoCommand.FAN_MODE_LOW)
@@ -212,6 +230,12 @@ describe('matter layer', () => {
 
       await handlers.percentSettingChange!({ percentSetting: 90 })
       expect(commands.run).toHaveBeenCalledWith(NeoCommand.FAN_MODE_HIGH)
+
+      await handlers.percentSettingChange!({ percentSetting: 0 })
+      expect(commands.run).toHaveBeenCalledWith(NeoCommand.OFF)
+
+      await handlers.percentSettingChange!({ percentSetting: null })
+      expect(commands.run).toHaveBeenCalledWith(NeoCommand.FAN_MODE_AUTO)
     })
 
     it('syncs state updates via binding.update', async () => {
@@ -273,7 +297,7 @@ describe('matter layer', () => {
     })
 
     it('creates an OnOffSwitch when zonesAsHeaterCoolers is false', async () => {
-      const { platform, commands } = makePlatform({ zonesAsHeaterCoolers: false })
+      const { platform, commands, matterApi } = makePlatform({ zonesAsHeaterCoolers: false })
       const { accessory, binding } = buildZoneMatterAccessory(platform, {
         id: 'zone-0',
         displayName: 'Living Room',
@@ -298,10 +322,9 @@ describe('matter layer', () => {
       expect(commands.run).toHaveBeenCalledWith(NeoCommand.ZONE_DISABLE, { zoneIndex: 0 })
 
       // Test state sync
-      const { matterApi: _matterApi } = makePlatform()
-      ;(platform.api.matter as unknown as typeof matterApi).updateAccessoryState.mockClear()
+      matterApi.updateAccessoryState.mockClear()
       binding.update(new Set(['UserAirconSettings.EnabledZones']))
-      expect(platform.api.matter?.updateAccessoryState).toHaveBeenCalledWith(
+      expect(matterApi.updateAccessoryState).toHaveBeenCalledWith(
         binding.uuid,
         'onOff',
         expect.objectContaining({ onOff: expect.any(Boolean) }),
@@ -467,6 +490,10 @@ describe('matter layer', () => {
         expect(result.accessory).toBeDefined()
         expect(result.binding).toBeDefined()
       }
+
+      expect(() => buildMatterAccessory(platform, { id: 'unknown', displayName: 'Unknown', kind: 'invalid' as never })).toThrow(
+        'Unsupported Matter device kind: invalid',
+      )
     })
   })
 })

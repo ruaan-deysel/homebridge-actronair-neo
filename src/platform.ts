@@ -143,7 +143,12 @@ export class ActronAirNeoPlatform implements DynamicPlatformPlugin {
 
       for (const binding of this.matterBindings.values()) {
         try {
-          binding.update(changed)
+          const result = binding.update(changed)
+          if (result && typeof (result as Promise<unknown>).catch === 'function') {
+            (result as Promise<unknown>).catch((error) => {
+              this.log.error(`Failed to update Matter accessory "${binding.accessory.displayName}": ${(error as Error).message}`)
+            })
+          }
         }
         catch (error) {
           this.log.error(`Failed to update Matter accessory "${binding.accessory.displayName}": ${(error as Error).message}`)
@@ -384,6 +389,8 @@ export class ActronAirNeoPlatform implements DynamicPlatformPlugin {
     const toUpdate: MatterAccessory[] = []
 
     for (const device of discovered) {
+      // Reserve the identity first so a build failure never unregisters a cached accessory.
+      wanted.add(matter.uuid.generate(`matter:${device.id}`))
       let built: { accessory: MatterAccessory, binding: MatterBinding }
       try {
         built = buildMatterAccessory(this, device)
@@ -394,7 +401,6 @@ export class ActronAirNeoPlatform implements DynamicPlatformPlugin {
       }
 
       const { accessory, binding } = built
-      wanted.add(accessory.UUID)
       this.matterBindings.set(accessory.UUID, binding)
 
       const existing = this.matterAccessories.get(accessory.UUID)

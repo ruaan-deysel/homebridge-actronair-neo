@@ -25,5 +25,7 @@ export function buildMatterAccessory(
       return buildOutdoorTempMatterAccessory(platform, device)
     case 'afterHours':
       return buildAfterHoursMatterAccessory(platform, device)
+    default:
+      throw new Error(`Unsupported Matter device kind: ${(device as { kind: string }).kind}`)
   }
 }
