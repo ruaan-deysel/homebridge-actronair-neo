@@ -217,7 +217,7 @@ export function buildZoneMatterAccessory(
     if (liveTemp !== undefined) {
       parts.push({
         id: 'temperature',
-        displayName: `${device.displayName} Temperature`,
+        displayName: matterString(`${device.displayName} Temperature`),
         deviceType: matter.deviceTypes.TemperatureSensor,
         clusters: {
           temperatureMeasurement: {
@@ -231,7 +231,7 @@ export function buildZoneMatterAccessory(
     if (liveHumidity !== undefined) {
       parts.push({
         id: 'humidity',
-        displayName: `${device.displayName} Humidity`,
+        displayName: matterString(`${device.displayName} Humidity`),
         deviceType: matter.deviceTypes.HumiditySensor,
         clusters: {
           relativeHumidityMeasurement: {

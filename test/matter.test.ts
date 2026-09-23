@@ -350,6 +350,21 @@ describe('matter layer', () => {
         expect.objectContaining({ onOff: expect.any(Boolean) }),
       )
     })
+
+    it('truncates switch-mode zone part names to the Matter string limit', () => {
+      const { platform } = makePlatform({ zonesAsHeaterCoolers: false })
+      const { accessory } = buildZoneMatterAccessory(platform, {
+        id: 'zone-0',
+        displayName: 'A'.repeat(40),
+        kind: 'zone',
+        zoneIndex: 0,
+      })
+
+      expect(accessory.parts).toBeDefined()
+      for (const part of accessory.parts!) {
+        expect(part.displayName.length).toBeLessThanOrEqual(32)
+      }
+    })
   })
 
   describe('switches (away, quiet, continuousFan, turbo)', () => {
