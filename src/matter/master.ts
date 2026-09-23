@@ -31,6 +31,17 @@ enum MatterFanMode {
   Auto = 5,
 }
 
+function fanSpeedCommand(platform: ActronAirNeoPlatform, speed: 'LOW' | 'MED' | 'HIGH' | 'AUTO'): NeoCommand {
+  const isCont = platform.state.get<string>('UserAirconSettings.FanMode')?.endsWith('+CONT') ?? false
+  const table = {
+    LOW: [NeoCommand.FAN_MODE_LOW, NeoCommand.FAN_MODE_LOW_CONT],
+    MED: [NeoCommand.FAN_MODE_MEDIUM, NeoCommand.FAN_MODE_MEDIUM_CONT],
+    HIGH: [NeoCommand.FAN_MODE_HIGH, NeoCommand.FAN_MODE_HIGH_CONT],
+    AUTO: [NeoCommand.FAN_MODE_AUTO, NeoCommand.FAN_MODE_AUTO_CONT],
+  } as const
+  return table[speed][isCont ? 1 : 0]
+}
+
 export function buildMasterMatterAccessory(
   platform: ActronAirNeoPlatform,
   device: Discovered,
@@ -115,17 +126,17 @@ export function buildMasterMatterAccessory(
               cmd = NeoCommand.OFF
               break
             case MatterFanMode.Low:
-              cmd = NeoCommand.FAN_MODE_LOW
+              cmd = fanSpeedCommand(platform, 'LOW')
               break
             case MatterFanMode.Medium:
-              cmd = NeoCommand.FAN_MODE_MEDIUM
+              cmd = fanSpeedCommand(platform, 'MED')
               break
             case MatterFanMode.High:
-              cmd = NeoCommand.FAN_MODE_HIGH
+              cmd = fanSpeedCommand(platform, 'HIGH')
               break
             case MatterFanMode.Auto:
             default:
-              cmd = NeoCommand.FAN_MODE_AUTO
+              cmd = fanSpeedCommand(platform, 'AUTO')
               break
           }
           assertMatterCommandSuccess(platform, await platform.commands.run(cmd))
@@ -140,16 +151,16 @@ export function buildMasterMatterAccessory(
             cmd = NeoCommand.OFF
           }
           else if (percentSetting === null || percentSetting === undefined) {
-            cmd = NeoCommand.FAN_MODE_AUTO
+            cmd = fanSpeedCommand(platform, 'AUTO')
           }
           else if (percentSetting <= 33) {
-            cmd = NeoCommand.FAN_MODE_LOW
+            cmd = fanSpeedCommand(platform, 'LOW')
           }
           else if (percentSetting <= 66) {
-            cmd = NeoCommand.FAN_MODE_MEDIUM
+            cmd = fanSpeedCommand(platform, 'MED')
           }
           else {
-            cmd = NeoCommand.FAN_MODE_HIGH
+            cmd = fanSpeedCommand(platform, 'HIGH')
           }
           assertMatterCommandSuccess(platform, await platform.commands.run(cmd))
           platform.log.debug(`Matter set Master Fan Percent -> ${percentSetting}`)

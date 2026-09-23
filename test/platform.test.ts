@@ -958,9 +958,12 @@ describe('actronAirNeoPlatform', () => {
         await p.discoverDevices()
       }
       finally {
+        expect(spy).toHaveBeenCalled()
         spy.mockRestore()
       }
 
+      expect(api.matter.registerPlatformAccessories).not.toHaveBeenCalled()
+      expect(api.matter.updatePlatformAccessories).not.toHaveBeenCalled()
       // Cached accessory must NOT be unregistered because its identity was reserved in wanted
       expect(api.matter.unregisterPlatformAccessories).not.toHaveBeenCalled()
       expect(p.matterAccessories.has('matter-uuid-matter:neo000000')).toBe(true)

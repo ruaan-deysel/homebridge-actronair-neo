@@ -236,6 +236,14 @@ describe('matter layer', () => {
 
       await handlers.percentSettingChange!({ percentSetting: null })
       expect(commands.run).toHaveBeenCalledWith(NeoCommand.FAN_MODE_AUTO)
+
+      // Continuous mode preservation
+      platform.state.applyDelta({ 'UserAirconSettings.FanMode': 'MED+CONT' })
+      await handlers.fanModeChange!({ fanMode: 1 /* Low */ })
+      expect(commands.run).toHaveBeenCalledWith(NeoCommand.FAN_MODE_LOW_CONT)
+
+      await handlers.percentSettingChange!({ percentSetting: 90 })
+      expect(commands.run).toHaveBeenCalledWith(NeoCommand.FAN_MODE_HIGH_CONT)
     })
 
     it('syncs state updates via binding.update', async () => {
@@ -276,8 +284,8 @@ describe('matter layer', () => {
       expect(binding.uuid).toBe(accessory.UUID)
     })
 
-    it('handles zone systemModeChange as zone enable/disable', async () => {
-      const { platform, commands } = makePlatform({ zonesAsHeaterCoolers: true })
+    it('handles zone systemModeChange as zone enable/disable and reconciles systemMode', async () => {
+      const { platform, commands, matterApi } = makePlatform({ zonesAsHeaterCoolers: true })
       const { accessory } = buildZoneMatterAccessory(platform, {
         id: 'zone-0',
         displayName: 'Living Room',
@@ -290,6 +298,11 @@ describe('matter layer', () => {
       // Turn Off
       await handlers.systemModeChange!({ systemMode: 0 })
       expect(commands.run).toHaveBeenCalledWith(NeoCommand.ZONE_DISABLE, { zoneIndex: 0 })
+      expect(matterApi.updateAccessoryState).toHaveBeenCalledWith(
+        accessory.UUID,
+        'thermostat',
+        expect.objectContaining({ systemMode: expect.any(Number) }),
+      )
 
       // Turn On (e.g. Auto = 1)
       await handlers.systemModeChange!({ systemMode: 1 })

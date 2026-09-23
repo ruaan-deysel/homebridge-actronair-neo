@@ -154,6 +154,9 @@ export function buildZoneMatterAccessory(
               await platform.commands.run(enable ? NeoCommand.ZONE_ENABLE : NeoCommand.ZONE_DISABLE, { zoneIndex: zi }),
             )
             platform.log.debug(`Matter set Zone ${zi} (${device.displayName}) mode -> ${systemMode} (enable: ${enable})`)
+            platform.api.matter?.updateAccessoryState(uuid, 'thermostat', { systemMode: getZoneSystemMode() }).catch((err) => {
+              platform.log.debug(`Failed to reconcile Matter zone ${zi} systemMode: ${(err as Error).message}`)
+            })
           },
           occupiedHeatingSetpointChange: async ({ occupiedHeatingSetpoint }: { occupiedHeatingSetpoint: number }) => {
             if (!platform.state.cloudConnected) {
