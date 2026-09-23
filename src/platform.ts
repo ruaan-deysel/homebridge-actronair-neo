@@ -3,11 +3,13 @@ import type {
   Characteristic,
   DynamicPlatformPlugin,
   Logging,
+  MatterAccessory,
   PlatformAccessory,
   PlatformConfig,
   Service,
 } from 'homebridge'
 import type { NeoConfig } from './config.js'
+import type { MatterBinding } from './matter/types.js'
 import type { NeoCapabilities } from './neo/capabilities.js'
 import { AfterHoursAccessory } from './accessories/afterHours.js'
 import { MASTER_SERVICE_NAME_SUFFIXES, MasterAccessory } from './accessories/master.js'
@@ -15,6 +17,7 @@ import { ModeSwitchAccessory } from './accessories/modeSwitch.js'
 import { OutdoorTempAccessory } from './accessories/outdoorTemp.js'
 import { ZoneAccessory } from './accessories/zone.js'
 import { parseConfig } from './config.js'
+import { buildMatterAccessory } from './matter/mapping.js'
 import { NeoAuth, NeoAuthRevokedError } from './neo/auth.js'
 import { deriveCapabilities } from './neo/capabilities.js'
 import { CommandQueue } from './neo/commands.js'
@@ -66,7 +69,7 @@ function withDebugLogging(log: Logging): Logging {
  * (`publishExternalAccessories`, which needs its own pairing). Setting it here would be inert
  * code that reads as a feature.
  */
-interface Discovered {
+export interface Discovered {
   id: string
   displayName: string
   kind: 'master' | 'zone' | 'away' | 'quiet' | 'continuousFan' | 'outdoorTemp' | 'afterHours' | 'turbo'
@@ -78,6 +81,9 @@ export class ActronAirNeoPlatform implements DynamicPlatformPlugin {
   public readonly Service: typeof Service
   public readonly Characteristic: typeof Characteristic
   public readonly accessories: PlatformAccessory[] = []
+  public readonly matterAccessories: Map<string, MatterAccessory> = new Map()
+  public readonly matterBindings: Map<string, MatterBinding> = new Map()
+  public readonly isMatterSupported: boolean
   public readonly state = new NeoState()
   public readonly cfg: NeoConfig
 
@@ -111,6 +117,11 @@ export class ActronAirNeoPlatform implements DynamicPlatformPlugin {
     this.cfg = parseConfig(config)
     this.log = this.cfg.debug ? withDebugLogging(log) : log
 
+    this.isMatterSupported = Boolean(
+      this.api.isMatterAvailable?.() && this.api.isMatterEnabled?.() && this.api.matter,
+    )
+    this.log.info(`Matter support: ${this.isMatterSupported ? 'enabled' : 'disabled'}`)
+
     if (this.cfg.refreshToken) {
       this.auth = new NeoAuth({
         baseUrl: BASE_URL,
@@ -129,6 +140,20 @@ export class ActronAirNeoPlatform implements DynamicPlatformPlugin {
     this.state.onChange((changed) => {
       if (changed.has('*') || [...changed].some(path => path.startsWith('UserAirconSettings.EnabledZones')))
         this.commands?.syncEnabledZones(this.state.get<boolean[]>('UserAirconSettings.EnabledZones') ?? [])
+
+      for (const binding of this.matterBindings.values()) {
+        try {
+          const result = binding.update(changed)
+          if (result && typeof (result as Promise<unknown>).catch === 'function') {
+            (result as Promise<unknown>).catch((error) => {
+              this.log.error(`Failed to update Matter accessory "${binding.accessory.displayName}": ${(error as Error).message}`)
+            })
+          }
+        }
+        catch (error) {
+          this.log.error(`Failed to update Matter accessory "${binding.accessory.displayName}": ${(error as Error).message}`)
+        }
+      }
     })
 
     this.api.on('didFinishLaunching', () => {
@@ -152,6 +177,11 @@ export class ActronAirNeoPlatform implements DynamicPlatformPlugin {
   configureAccessory(accessory: PlatformAccessory): void {
     this.log.info(`Loading accessory from cache: ${accessory.displayName}`)
     this.accessories.push(accessory)
+  }
+
+  configureMatterAccessory(accessory: MatterAccessory): void {
+    this.log.info(`Loading Matter accessory from cache: ${accessory.displayName}`)
+    this.matterAccessories.set(accessory.UUID, accessory)
   }
 
   async discoverDevices(): Promise<void> {
@@ -252,6 +282,15 @@ export class ActronAirNeoPlatform implements DynamicPlatformPlugin {
     catch (error) {
       this.log.error(`Accessory sync failed: ${(error as Error).message}`)
     }
+
+    if (this.isMatterSupported) {
+      try {
+        await this.syncMatterAccessories(discovered)
+      }
+      catch (error) {
+        this.log.error(`Matter accessory sync failed: ${(error as Error).message}`)
+      }
+    }
     this.startPolling()
   }
 
@@ -336,6 +375,87 @@ export class ActronAirNeoPlatform implements DynamicPlatformPlugin {
         const index = this.accessories.indexOf(accessory)
         if (index !== -1)
           this.accessories.splice(index, 1)
+      }
+    }
+  }
+
+  private async syncMatterAccessories(discovered: Discovered[]): Promise<void> {
+    const matter = this.api.matter
+    if (!matter)
+      return
+
+    const wanted = new Set<string>()
+    const toRegister: MatterAccessory[] = []
+    const toUpdate: MatterAccessory[] = []
+
+    for (const device of discovered) {
+      // Reserve the identity first so a build failure never unregisters a cached accessory.
+      wanted.add(matter.uuid.generate(`matter:${device.id}`))
+      let built: { accessory: MatterAccessory, binding: MatterBinding }
+      try {
+        built = buildMatterAccessory(this, device)
+      }
+      catch (error) {
+        this.log.error(`Failed to build Matter accessory for "${device.displayName}": ${(error as Error).message}`)
+        continue
+      }
+
+      const { accessory, binding } = built
+      this.matterBindings.set(accessory.UUID, binding)
+
+      const existing = this.matterAccessories.get(accessory.UUID)
+      if (existing) {
+        this.log.info(`Restoring Matter accessory from cache: ${accessory.displayName}`)
+        existing.displayName = accessory.displayName
+        existing.deviceType = accessory.deviceType
+        existing.clusters = accessory.clusters
+        existing.handlers = accessory.handlers
+        existing.parts = accessory.parts
+        toUpdate.push(existing)
+      }
+      else {
+        toRegister.push(accessory)
+      }
+    }
+
+    if (toRegister.length > 0) {
+      this.log.info(`Registering ${toRegister.length} Matter accessories`)
+      try {
+        await matter.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, toRegister)
+        for (const acc of toRegister) {
+          this.matterAccessories.set(acc.UUID, acc)
+        }
+      }
+      catch (error) {
+        this.log.error(`Failed to register Matter accessories: ${(error as Error).message}`)
+      }
+    }
+
+    if (toUpdate.length > 0) {
+      try {
+        await matter.updatePlatformAccessories(toUpdate)
+      }
+      catch (error) {
+        this.log.error(`Failed to update Matter accessories: ${(error as Error).message}`)
+      }
+    }
+
+    const stale: MatterAccessory[] = []
+    for (const [uuid, acc] of this.matterAccessories.entries()) {
+      if (!wanted.has(uuid)) {
+        stale.push(acc)
+        this.matterAccessories.delete(uuid)
+        this.matterBindings.delete(uuid)
+      }
+    }
+
+    if (stale.length > 0) {
+      this.log.info(`Removing ${stale.length} Matter accessories that are no longer present`)
+      try {
+        await matter.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, stale)
+      }
+      catch (error) {
+        this.log.error(`Failed to unregister stale Matter accessories: ${(error as Error).message}`)
       }
     }
   }
