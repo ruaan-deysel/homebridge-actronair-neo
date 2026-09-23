@@ -5,7 +5,7 @@ import type { MatterBinding } from './types.js'
 import { getUsableZoneHumidity, getUsableZoneTemp, getUserSetpointLimits, resolveSetpointBounds } from '../neo/capabilities.js'
 import { resolveZoneSensor } from '../neo/sensors.js'
 import { ClimateMode, NeoCommand } from '../neo/types.js'
-import { assertMatterCommandSuccess } from './types.js'
+import { assertMatterCommandSuccess, matterString } from './types.js'
 
 type MatterAccessoryPart = NonNullable<MatterAccessory['parts']>[number]
 
@@ -135,10 +135,10 @@ export function buildZoneMatterAccessory(
 
     accessory = {
       UUID: uuid,
-      displayName: device.displayName,
+      displayName: matterString(device.displayName),
       deviceType: matter.deviceTypes.Thermostat,
       manufacturer: 'Actron',
-      model: `${platform.capabilities?.model ?? 'ActronAir Neo'} Zone Controller`,
+      model: matterString(`${platform.capabilities?.model ?? 'ActronAir Neo'} Zone`),
       serialNumber: `${platform.serial}-zone-${zi}`,
       context: { device },
       clusters,
@@ -243,10 +243,10 @@ export function buildZoneMatterAccessory(
 
     accessory = {
       UUID: uuid,
-      displayName: device.displayName,
+      displayName: matterString(device.displayName),
       deviceType: matter.deviceTypes.OnOffSwitch,
       manufacturer: 'Actron',
-      model: `${platform.capabilities?.model ?? 'ActronAir Neo'} Zone Switch`,
+      model: matterString(`${platform.capabilities?.model ?? 'ActronAir Neo'} Zone`),
       serialNumber: `${platform.serial}-zone-${zi}`,
       context: { device },
       clusters,
@@ -309,8 +309,7 @@ export function buildZoneMatterAccessory(
         }
         if (all || sensorChanged || zoneChanged) {
           const currentTemp = getUsableZoneTemp(platform.state, zi)
-          if (currentTemp !== undefined)
-            update.localTemperature = Math.round(currentTemp * 100)
+          update.localTemperature = currentTemp !== undefined ? Math.round(currentTemp * 100) : null
         }
 
         if (Object.keys(update).length > 0) {
@@ -328,27 +327,23 @@ export function buildZoneMatterAccessory(
         }
         if (all || sensorChanged || zoneChanged) {
           const currentTemp = getUsableZoneTemp(platform.state, zi)
-          if (currentTemp !== undefined) {
-            platform.api.matter?.updateAccessoryState(
-              uuid,
-              'temperatureMeasurement',
-              { measuredValue: Math.round(currentTemp * 100) },
-              'temperature',
-            ).catch((err) => {
-              platform.log.debug(`Failed to update Matter zone ${zi} temperature: ${(err as Error).message}`)
-            })
-          }
+          platform.api.matter?.updateAccessoryState(
+            uuid,
+            'temperatureMeasurement',
+            { measuredValue: currentTemp !== undefined ? Math.round(currentTemp * 100) : null },
+            'temperature',
+          ).catch((err) => {
+            platform.log.debug(`Failed to update Matter zone ${zi} temperature: ${(err as Error).message}`)
+          })
           const currentHum = getUsableZoneHumidity(platform.state, zi)
-          if (currentHum !== undefined) {
-            platform.api.matter?.updateAccessoryState(
-              uuid,
-              'relativeHumidityMeasurement',
-              { measuredValue: Math.round(currentHum * 100) },
-              'humidity',
-            ).catch((err) => {
-              platform.log.debug(`Failed to update Matter zone ${zi} humidity: ${(err as Error).message}`)
-            })
-          }
+          platform.api.matter?.updateAccessoryState(
+            uuid,
+            'relativeHumidityMeasurement',
+            { measuredValue: currentHum !== undefined ? Math.round(currentHum * 100) : null },
+            'humidity',
+          ).catch((err) => {
+            platform.log.debug(`Failed to update Matter zone ${zi} humidity: ${(err as Error).message}`)
+          })
         }
       }
 

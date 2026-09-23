@@ -415,17 +415,29 @@ export class ActronAirNeoPlatform implements DynamicPlatformPlugin {
       }
       else {
         toRegister.push(accessory)
-        this.matterAccessories.set(accessory.UUID, accessory)
       }
     }
 
     if (toRegister.length > 0) {
       this.log.info(`Registering ${toRegister.length} Matter accessories`)
-      await matter.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, toRegister)
+      try {
+        await matter.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, toRegister)
+        for (const acc of toRegister) {
+          this.matterAccessories.set(acc.UUID, acc)
+        }
+      }
+      catch (error) {
+        this.log.error(`Failed to register Matter accessories: ${(error as Error).message}`)
+      }
     }
 
     if (toUpdate.length > 0) {
-      await matter.updatePlatformAccessories(toUpdate)
+      try {
+        await matter.updatePlatformAccessories(toUpdate)
+      }
+      catch (error) {
+        this.log.error(`Failed to update Matter accessories: ${(error as Error).message}`)
+      }
     }
 
     const stale: MatterAccessory[] = []
@@ -439,7 +451,12 @@ export class ActronAirNeoPlatform implements DynamicPlatformPlugin {
 
     if (stale.length > 0) {
       this.log.info(`Removing ${stale.length} Matter accessories that are no longer present`)
-      await matter.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, stale)
+      try {
+        await matter.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, stale)
+      }
+      catch (error) {
+        this.log.error(`Failed to unregister stale Matter accessories: ${(error as Error).message}`)
+      }
     }
   }
 

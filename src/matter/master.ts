@@ -3,7 +3,7 @@ import type { ActronAirNeoPlatform, Discovered } from '../platform.js'
 import type { MatterBinding } from './types.js'
 import { getUsableMasterHumidity, getUsableMasterTemp, resolveSetpointBounds } from '../neo/capabilities.js'
 import { ClimateMode, FanMode, NeoCommand } from '../neo/types.js'
-import { assertMatterCommandSuccess } from './types.js'
+import { assertMatterCommandSuccess, matterString } from './types.js'
 
 type MatterAccessoryPart = NonNullable<MatterAccessory['parts']>[number]
 
@@ -104,7 +104,7 @@ export function buildMasterMatterAccessory(
   const initialFanState = getFanState()
   parts.push({
     id: 'fan',
-    displayName: `${device.displayName} Fan`,
+    displayName: matterString(`${device.displayName} Fan`),
     deviceType: matter.deviceTypes.Fan,
     clusters: {
       fanControl: {
@@ -123,6 +123,9 @@ export function buildMasterMatterAccessory(
           let cmd: NeoCommand
           switch (fanMode) {
             case MatterFanMode.Off:
+              if (platform.state.get<string>('UserAirconSettings.Mode') !== ClimateMode.FAN) {
+                throw new Error('Fan cannot be turned off independently of the system')
+              }
               cmd = NeoCommand.OFF
               break
             case MatterFanMode.Low:
@@ -148,6 +151,9 @@ export function buildMasterMatterAccessory(
           }
           let cmd: NeoCommand
           if (percentSetting === 0) {
+            if (platform.state.get<string>('UserAirconSettings.Mode') !== ClimateMode.FAN) {
+              throw new Error('Fan cannot be turned off independently of the system')
+            }
             cmd = NeoCommand.OFF
           }
           else if (percentSetting === null || percentSetting === undefined) {
@@ -174,7 +180,7 @@ export function buildMasterMatterAccessory(
   if (liveHumidity !== undefined) {
     parts.push({
       id: 'humidity',
-      displayName: `${device.displayName} Humidity`,
+      displayName: matterString(`${device.displayName} Humidity`),
       deviceType: matter.deviceTypes.HumiditySensor,
       clusters: {
         relativeHumidityMeasurement: {
@@ -186,10 +192,10 @@ export function buildMasterMatterAccessory(
 
   const accessory: MatterAccessory = {
     UUID: uuid,
-    displayName: device.displayName,
+    displayName: matterString(device.displayName),
     deviceType: matter.deviceTypes.Thermostat,
     manufacturer: 'Actron',
-    model: platform.capabilities?.model ?? 'ActronAir Neo Master Controller',
+    model: matterString(platform.capabilities?.model ?? 'ActronAir Neo Master Controller'),
     serialNumber: platform.serial,
     context: { device },
     clusters: {
@@ -287,8 +293,7 @@ export function buildMasterMatterAccessory(
       }
       if (all || changed.has('MasterInfo.LiveTemp_oC')) {
         const temp = getUsableMasterTemp(platform.state)
-        if (temp !== undefined)
-          thermostatUpdate.localTemperature = Math.round(temp * 100)
+        thermostatUpdate.localTemperature = temp !== undefined ? Math.round(temp * 100) : null
       }
 
       if (Object.keys(thermostatUpdate).length > 0) {
@@ -306,16 +311,14 @@ export function buildMasterMatterAccessory(
 
       if (all || changed.has('MasterInfo.LiveHumidity_pc')) {
         const hum = getUsableMasterHumidity(platform.state)
-        if (hum !== undefined) {
-          platform.api.matter?.updateAccessoryState(
-            uuid,
-            'relativeHumidityMeasurement',
-            { measuredValue: Math.round(hum * 100) },
-            'humidity',
-          ).catch((err) => {
-            platform.log.debug(`Failed to update Matter master humidity state: ${(err as Error).message}`)
-          })
-        }
+        platform.api.matter?.updateAccessoryState(
+          uuid,
+          'relativeHumidityMeasurement',
+          { measuredValue: hum !== undefined ? Math.round(hum * 100) : null },
+          'humidity',
+        ).catch((err) => {
+          platform.log.debug(`Failed to update Matter master humidity state: ${(err as Error).message}`)
+        })
       }
     },
   }

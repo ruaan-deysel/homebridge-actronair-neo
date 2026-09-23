@@ -911,7 +911,7 @@ describe('actronAirNeoPlatform', () => {
 
       // HAP accessories were registered despite Matter error
       expect(api.registerPlatformAccessories).toHaveBeenCalled()
-      expect(log.error).toHaveBeenCalledWith('Matter accessory sync failed: Matter daemon crashed')
+      expect(log.error).toHaveBeenCalledWith('Failed to register Matter accessories: Matter daemon crashed')
     })
 
     it('catches async errors thrown in matterBindings update during state changes', async () => {

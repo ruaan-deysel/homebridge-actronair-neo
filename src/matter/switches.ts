@@ -2,7 +2,7 @@ import type { MatterAccessory } from 'homebridge'
 import type { ActronAirNeoPlatform, Discovered } from '../platform.js'
 import type { MatterBinding } from './types.js'
 import { NeoCommand } from '../neo/types.js'
-import { assertMatterCommandSuccess } from './types.js'
+import { assertMatterCommandSuccess, matterString } from './types.js'
 
 export type ModeSwitchMode = 'away' | 'quiet' | 'continuousFan' | 'turbo'
 
@@ -65,10 +65,10 @@ export function buildSwitchMatterAccessory(
 
   const accessory: MatterAccessory = {
     UUID: uuid,
-    displayName: device.displayName,
+    displayName: matterString(device.displayName),
     deviceType: matter.deviceTypes.OnOffSwitch,
     manufacturer: 'Actron',
-    model: `${platform.capabilities?.model ?? 'ActronAir Neo'} ${mode} Switch`,
+    model: matterString(`${platform.capabilities?.model ?? 'ActronAir Neo'} ${mode}`),
     serialNumber: `${platform.serial}-${mode}`,
     context: { device },
     clusters: {

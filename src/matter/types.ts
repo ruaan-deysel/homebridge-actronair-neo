@@ -8,6 +8,13 @@ export interface MatterBinding {
   update: (changed: Set<string>) => void | Promise<void>
 }
 
+export const MATTER_STRING_MAX = 32
+
+export function matterString(value: string, max = MATTER_STRING_MAX): string {
+  const trimmed = value.trim()
+  return trimmed.length <= max ? trimmed : trimmed.slice(0, max).trimEnd()
+}
+
 export function assertMatterCommandSuccess(platform: ActronAirNeoPlatform, result: CommandResult): void {
   if (result !== CommandResult.SUCCESS) {
     if (platform.api.matter?.status?.Failure) {

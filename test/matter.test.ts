@@ -218,8 +218,8 @@ describe('matter layer', () => {
       await handlers.fanModeChange!({ fanMode: 5 /* Auto */ })
       expect(commands.run).toHaveBeenCalledWith(NeoCommand.FAN_MODE_AUTO)
 
-      await handlers.fanModeChange!({ fanMode: 0 /* Off */ })
-      expect(commands.run).toHaveBeenCalledWith(NeoCommand.OFF)
+      // Rejects turning fan off when system is in climate mode (e.g. COOL)
+      await expect(handlers.fanModeChange!({ fanMode: 0 /* Off */ })).rejects.toThrow('Fan cannot be turned off independently of the system')
 
       // Percent settings
       await handlers.percentSettingChange!({ percentSetting: 25 })
@@ -231,11 +231,18 @@ describe('matter layer', () => {
       await handlers.percentSettingChange!({ percentSetting: 90 })
       expect(commands.run).toHaveBeenCalledWith(NeoCommand.FAN_MODE_HIGH)
 
-      await handlers.percentSettingChange!({ percentSetting: 0 })
-      expect(commands.run).toHaveBeenCalledWith(NeoCommand.OFF)
+      await expect(handlers.percentSettingChange!({ percentSetting: 0 })).rejects.toThrow('Fan cannot be turned off independently of the system')
 
       await handlers.percentSettingChange!({ percentSetting: null })
       expect(commands.run).toHaveBeenCalledWith(NeoCommand.FAN_MODE_AUTO)
+
+      // In FAN mode, turning fan off or setting 0% turns off the system
+      platform.state.applyDelta({ 'UserAirconSettings.Mode': 'FAN' })
+      await handlers.fanModeChange!({ fanMode: 0 /* Off */ })
+      expect(commands.run).toHaveBeenCalledWith(NeoCommand.OFF)
+
+      await handlers.percentSettingChange!({ percentSetting: 0 })
+      expect(commands.run).toHaveBeenCalledWith(NeoCommand.OFF)
 
       // Continuous mode preservation
       platform.state.applyDelta({ 'UserAirconSettings.FanMode': 'MED+CONT' })
@@ -507,6 +514,15 @@ describe('matter layer', () => {
       expect(() => buildMatterAccessory(platform, { id: 'unknown', displayName: 'Unknown', kind: 'invalid' as never })).toThrow(
         'Unsupported Matter device kind: invalid',
       )
+    })
+  })
+
+  describe('matterString helper', () => {
+    it('truncates strings longer than 32 characters and trims trailing whitespace', async () => {
+      const { matterString } = await import('../src/matter/types.js')
+      expect(matterString('Short Name')).toBe('Short Name')
+      expect(matterString('A'.repeat(40))).toBe('A'.repeat(32))
+      expect(matterString('Hello World               ')).toBe('Hello World')
     })
   })
 })

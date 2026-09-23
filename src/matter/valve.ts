@@ -2,7 +2,7 @@ import type { MatterAccessory } from 'homebridge'
 import type { ActronAirNeoPlatform, Discovered } from '../platform.js'
 import type { MatterBinding } from './types.js'
 import { NeoCommand } from '../neo/types.js'
-import { assertMatterCommandSuccess } from './types.js'
+import { assertMatterCommandSuccess, matterString } from './types.js'
 
 const ENABLED_PATH = 'UserAirconSettings.AfterHours.Enabled'
 const DURATION_PATH = 'UserAirconSettings.AfterHours.Duration'
@@ -34,10 +34,10 @@ export function buildAfterHoursMatterAccessory(
 
   const accessory: MatterAccessory = {
     UUID: uuid,
-    displayName: device.displayName,
+    displayName: matterString(device.displayName),
     deviceType: matter.deviceTypes.WaterValve,
     manufacturer: 'Actron',
-    model: `${platform.capabilities?.model ?? 'ActronAir Neo'} After Hours`,
+    model: matterString(`${platform.capabilities?.model ?? 'ActronAir Neo'} After Hours`),
     serialNumber: `${platform.serial}-after-hours`,
     context: { device },
     clusters: {

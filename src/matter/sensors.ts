@@ -2,6 +2,7 @@ import type { MatterAccessory } from 'homebridge'
 import type { ActronAirNeoPlatform, Discovered } from '../platform.js'
 import type { MatterBinding } from './types.js'
 import { getUsableOutdoorTemp } from '../neo/capabilities.js'
+import { matterString } from './types.js'
 
 export function buildOutdoorTempMatterAccessory(
   platform: ActronAirNeoPlatform,
@@ -14,10 +15,10 @@ export function buildOutdoorTempMatterAccessory(
 
   const accessory: MatterAccessory = {
     UUID: uuid,
-    displayName: device.displayName,
+    displayName: matterString(device.displayName),
     deviceType: matter.deviceTypes.TemperatureSensor,
     manufacturer: 'Actron',
-    model: platform.capabilities?.model ?? 'ActronAir Neo Outdoor Temperature',
+    model: matterString(platform.capabilities?.model ?? 'ActronAir Neo Outdoor Temperature'),
     serialNumber: `${platform.serial}-outdoor`,
     context: { device },
     clusters: {
