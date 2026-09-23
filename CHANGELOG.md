@@ -5,6 +5,18 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-09-24
+
+### Added
+
+- **Native Matter support.** Exposes ActronAir Neo systems as native Matter accessories when running on Matter-enabled Homebridge 2.x platforms, while retaining full Apple HomeKit / HAP compatibility in dual-stack mode (closes #15).
+  - **Master HVAC Thermostat:** Mapped to Matter `Thermostat` with cooling/heating setpoints, deadband management, system mode controls (Off, Cool, Heat, Auto), and optional child endpoints for `FanControl` and `RelativeHumidityMeasurement`.
+  - **Zone Accessories:** Supports both Thermostat mode (`zonesAsHeaterCoolers` with `powerSource` battery reporting for wireless sensors) and Switch mode (`OnOffSwitch` with child temperature and humidity sensors).
+  - **Mode Switches:** Dedicated `OnOffSwitch` accessories for Away mode, Quiet mode, Continuous fan (preserving underlying fan speed), and Turbo mode.
+  - **Outdoor Temperature Sensor:** Exposes ambient temperature via Matter `TemperatureSensor` in centidegrees Celsius with fault and staleness checking.
+  - **After Hours Run-on Timer:** Exposes timed operation as a Matter `WaterValve` with duration configuration (30 minutes to 8 hours).
+  - **Real-Time State Synchronization:** Bidirectional sync across Matter cluster attributes and realtime MQTT/REST ActronAir state updates.
+
 ## [1.2.1] - 2026-08-31
 
 ### Changed

@@ -5,11 +5,12 @@
 [![npm](https://img.shields.io/npm/dt/homebridge-actronair-neo)](https://www.npmjs.com/package/homebridge-actronair-neo)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-Control your ActronAir Neo air conditioning system with Apple HomeKit using Homebridge.
+Control your ActronAir Neo air conditioning system with Apple HomeKit and Matter using Homebridge.
 
 ## Table of Contents
 
 - [What it does](#what-it-does)
+- [Matter Support](#matter-support)
 - [Requirements](#requirements)
 - [Installation](#installation)
 - [Configuration](#configuration)
@@ -19,7 +20,7 @@ Control your ActronAir Neo air conditioning system with Apple HomeKit using Home
 
 ## What it does
 
-The plugin exposes an ActronAir Neo system as HomeKit accessories through Homebridge:
+The plugin exposes an ActronAir Neo system as HomeKit and Matter accessories through Homebridge:
 
 - The master controller as a Heater/Cooler accessory, reporting and setting mode, fan
   speed, temperature and humidity.
@@ -53,6 +54,18 @@ The plugin auto-detects your ActronAir model and its reported capabilities on st
 accessories and options your unit actually supports — for example, the fan speed slider
 only offers the speeds your indoor unit reports, and switches for unsupported features
 simply aren't created. The detected model and capabilities are logged once at startup.
+
+## Matter Support
+
+Starting with Homebridge 2.x and plugin v1.3.0, `homebridge-actronair-neo` supports native Matter in dual-stack mode alongside HomeKit (HAP). When Homebridge's Matter bridge is enabled, your ActronAir Neo system is exposed as native Matter accessories:
+
+- **Master HVAC Thermostat:** Mapped to Matter `Thermostat` with standard cooling/heating setpoints, deadband management, system mode controls (Off, Cool, Heat, Auto), and optional child endpoints for `FanControl` and `RelativeHumidityMeasurement`.
+- **Zone Accessories:** Exposed either as Matter Thermostats (with battery status for wireless zone sensors) when **Enable zone control** is enabled, or On/Off Switches with child temperature and humidity sensors.
+- **Switches & Controls:** Dedicated `OnOffSwitch` accessories for Away mode, Quiet mode, Continuous fan (preserving underlying fan speed), and Turbo mode.
+- **After Hours Run-on Timer:** Exposes timed operation as a Matter `WaterValve` with duration configuration (30 minutes to 8 hours).
+- **Outdoor Temperature Sensor:** Exposes ambient temperature via Matter `TemperatureSensor` in centidegrees Celsius with fault and staleness checking.
+
+This allows integrating your ActronAir Neo system across Matter-compatible smart home ecosystems including Apple Home, Google Home, Amazon Alexa, and Samsung SmartThings.
 
 ## Requirements
 

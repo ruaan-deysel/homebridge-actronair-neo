@@ -22,8 +22,26 @@ vi.mock('../src/neo/mqtt.js', () => ({
 const restStatus = JSON.parse(readFileSync('test/fixtures/rest-status.json', 'utf8'))
 const systems = JSON.parse(readFileSync('test/fixtures/ac-systems.json', 'utf8'))
 
-function makeApi() {
+function makeApi(options: { matterEnabled?: boolean } = {}) {
   const handlers: Record<string, () => void> = {}
+  const matterMock = options.matterEnabled
+    ? {
+        uuid: { generate: (s: string) => `matter-uuid-${s}` },
+        deviceTypes: {
+          Thermostat: { name: 'Thermostat' },
+          Fan: { name: 'Fan' },
+          HumiditySensor: { name: 'HumiditySensor' },
+          TemperatureSensor: { name: 'TemperatureSensor' },
+          OnOffSwitch: { name: 'OnOffSwitch' },
+          WaterValve: { name: 'WaterValve' },
+        },
+        registerPlatformAccessories: vi.fn().mockResolvedValue(undefined),
+        unregisterPlatformAccessories: vi.fn().mockResolvedValue(undefined),
+        updatePlatformAccessories: vi.fn().mockResolvedValue(undefined),
+        updateAccessoryState: vi.fn().mockResolvedValue(undefined),
+      }
+    : undefined
+
   return {
     hap: { Service: {}, Characteristic: {}, uuid: { generate: (s: string) => `uuid-${s}` }, HapStatusError: class {} },
     user: { storagePath: () => '/tmp/hb' },
@@ -35,6 +53,9 @@ function makeApi() {
     registerPlatformAccessories: vi.fn(),
     unregisterPlatformAccessories: vi.fn(),
     updatePlatformAccessories: vi.fn(),
+    isMatterAvailable: vi.fn().mockReturnValue(Boolean(options.matterEnabled)),
+    isMatterEnabled: vi.fn().mockReturnValue(Boolean(options.matterEnabled)),
+    matter: matterMock,
     handlers,
   } as never
 }
@@ -793,6 +814,105 @@ describe('actronAirNeoPlatform', () => {
 
     expect(log.debug).toHaveBeenCalledWith('queued command')
     expect(log.info).not.toHaveBeenCalled()
+  })
+
+  describe('matter integration', () => {
+    it('detects disabled Matter when not available on bridge', () => {
+      const api = makeApi({ matterEnabled: false })
+      log.info.mockClear()
+      const p = new ActronAirNeoPlatform(log, { platform: 'ActronAirNeo', name: 'x' } as never, api)
+      expect(p.isMatterSupported).toBe(false)
+      expect(log.info).toHaveBeenCalledWith('Matter support: disabled')
+    })
+
+    it('detects enabled Matter and registers discovered accessories', async () => {
+      const api = makeApi({ matterEnabled: true })
+      log.info.mockClear()
+      const p = new ActronAirNeoPlatform(log, { platform: 'ActronAirNeo', name: 'x', refreshToken: 'rt' } as never, api)
+      expect(p.isMatterSupported).toBe(true)
+      expect(log.info).toHaveBeenCalledWith('Matter support: enabled')
+
+      p.injectForTest({
+        getSystems: async () => systems,
+        getStatus: async () => restStatus,
+      } as never)
+
+      await p.discoverDevices()
+
+      expect(api.matter.registerPlatformAccessories).toHaveBeenCalledWith(
+        'homebridge-actronair-neo',
+        'ActronAirNeo',
+        expect.any(Array),
+      )
+      expect(p.matterAccessories.size).toBeGreaterThan(0)
+    })
+
+    it('updates cached Matter accessories restored via configureMatterAccessory', async () => {
+      const api = makeApi({ matterEnabled: true })
+      const p = new ActronAirNeoPlatform(log, { platform: 'ActronAirNeo', name: 'x', refreshToken: 'rt' } as never, api)
+
+      const cachedMaster = {
+        UUID: 'matter-uuid-matter:neo000000',
+        displayName: 'Old Name',
+        context: {},
+      } as never
+      p.configureMatterAccessory(cachedMaster)
+      expect(p.matterAccessories.get('matter-uuid-matter:neo000000')).toBe(cachedMaster)
+
+      p.injectForTest({
+        getSystems: async () => systems,
+        getStatus: async () => restStatus,
+      } as never)
+
+      await p.discoverDevices()
+
+      expect(api.matter.updatePlatformAccessories).toHaveBeenCalledWith(
+        expect.arrayContaining([cachedMaster]),
+      )
+    })
+
+    it('unregisters stale Matter accessories no longer present', async () => {
+      const api = makeApi({ matterEnabled: true })
+      const p = new ActronAirNeoPlatform(log, { platform: 'ActronAirNeo', name: 'x', refreshToken: 'rt' } as never, api)
+
+      const stale = {
+        UUID: 'matter-uuid-matter:stale-device',
+        displayName: 'Removed Zone',
+        context: {},
+      } as never
+      p.configureMatterAccessory(stale)
+
+      p.injectForTest({
+        getSystems: async () => systems,
+        getStatus: async () => restStatus,
+      } as never)
+
+      await p.discoverDevices()
+
+      expect(api.matter.unregisterPlatformAccessories).toHaveBeenCalledWith(
+        'homebridge-actronair-neo',
+        'ActronAirNeo',
+        [stale],
+      )
+      expect(p.matterAccessories.has('matter-uuid-matter:stale-device')).toBe(false)
+    })
+
+    it('isolates Matter failures so HAP accessories still register', async () => {
+      const api = makeApi({ matterEnabled: true })
+      api.matter.registerPlatformAccessories.mockRejectedValue(new Error('Matter daemon crashed'))
+
+      const p = new ActronAirNeoPlatform(log, { platform: 'ActronAirNeo', name: 'x', refreshToken: 'rt' } as never, api)
+      p.injectForTest({
+        getSystems: async () => systems,
+        getStatus: async () => restStatus,
+      } as never)
+
+      await p.discoverDevices()
+
+      // HAP accessories were registered despite Matter error
+      expect(api.registerPlatformAccessories).toHaveBeenCalled()
+      expect(log.error).toHaveBeenCalledWith('Matter accessory sync failed: Matter daemon crashed')
+    })
   })
 })
 
