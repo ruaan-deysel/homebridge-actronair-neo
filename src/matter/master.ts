@@ -30,6 +30,14 @@ enum MatterFanMode {
   High = 3,
   Auto = 5,
 }
+function resolveFanModeSequence(speeds: FanMode[]): number {
+  const hasAuto = speeds.includes(FanMode.AUTO)
+  const hasMed = speeds.includes(FanMode.MEDIUM)
+  if (hasAuto) {
+    return hasMed ? 2 /* OffLowMedHighAuto */ : 3 /* OffLowHighAuto */
+  }
+  return hasMed ? 0 /* OffLowMedHigh */ : 1 /* OffLowHigh */
+}
 
 function fanSpeedCommand(platform: ActronAirNeoPlatform, speed: 'LOW' | 'MED' | 'HIGH' | 'AUTO'): NeoCommand {
   const isCont = platform.state.get<string>('UserAirconSettings.FanMode')?.endsWith('+CONT') ?? false
@@ -109,6 +117,7 @@ export function buildMasterMatterAccessory(
     clusters: {
       fanControl: {
         fanMode: initialFanState.fanMode,
+        fanModeSequence: resolveFanModeSequence(platform.capabilities?.fanSpeeds ?? []),
         percentSetting: initialFanState.percentSetting,
         percentCurrent: initialFanState.percentCurrent,
         speedMax: 3,
@@ -212,7 +221,7 @@ export function buildMasterMatterAccessory(
         absMaxHeatSetpointLimit: 3000,
         absMinCoolSetpointLimit: 1600,
         absMaxCoolSetpointLimit: 3200,
-        minSetpointDeadBand: 20,
+        minSetpointDeadBand: 0,
         controlSequenceOfOperation: 4,
       },
     },

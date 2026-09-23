@@ -100,13 +100,14 @@ describe('matter layer', () => {
       expect(accessory.displayName).toBe('Air Conditioner')
       expect(accessory.deviceType).toEqual({ name: 'Thermostat' })
       expect(accessory.clusters?.thermostat).toBeDefined()
-      expect(accessory.clusters?.thermostat?.minSetpointDeadBand).toBe(20)
+      expect(accessory.clusters?.thermostat?.minSetpointDeadBand).toBe(0)
       expect(accessory.clusters?.thermostat?.occupiedHeatingSetpoint).toBe(2200)
       expect(accessory.clusters?.thermostat?.occupiedCoolingSetpoint).toBe(2200)
 
       expect(accessory.parts).toHaveLength(2)
       expect(accessory.parts?.[0].id).toBe('fan')
       expect(accessory.parts?.[0].deviceType).toEqual({ name: 'Fan' })
+      expect(accessory.parts?.[0].clusters?.fanControl?.fanModeSequence).toBe(2)
       expect(accessory.parts?.[1].id).toBe('humidity')
       expect(accessory.parts?.[1].deviceType).toEqual({ name: 'HumiditySensor' })
 

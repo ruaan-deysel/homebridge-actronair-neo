@@ -124,7 +124,7 @@ export function buildZoneMatterAccessory(
         absMaxHeatSetpointLimit: 3000,
         absMinCoolSetpointLimit: 1600,
         absMaxCoolSetpointLimit: 3200,
-        minSetpointDeadBand: 20,
+        minSetpointDeadBand: 0,
         controlSequenceOfOperation: 4,
       },
     }
