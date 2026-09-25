@@ -94,13 +94,18 @@ A Homebridge dynamic platform plugin for ActronAir Neo HVAC, talking to the Neo 
    `replace()` takes a full snapshot (a REST poll or an MQTT full-status). `applyDelta()`
    takes a flat map of dotted/bracket paths (`RemoteZoneInfo[0].LiveTemp_oC`) — the same
    notation Neo uses for both MQTT status-change deltas and outgoing commands, see
-   `src/neo/paths.ts`. `applyDelta()` reports `ok: false` with the offending paths in
-   `rejected` when a path it knows carries a value it cannot accept; callers must treat that
-   as "resync from REST" rather than ignore it, or HomeKit drifts from the device with no
-   error ever surfacing. A path the plugin simply doesn't read is different: it lands in
-   `ignored`, leaves `ok` true, and triggers no resync — the cloud bundles fields we don't
-   consume into the same broadcast as ones we do, so treating those as failures would discard
-   every real update. Verified against live broker traffic; don't "tighten" it back.
+   `src/neo/paths.ts` — and does not flatten object values. `applyDelta()` reports `ok: false`
+   with the offending paths in `rejected` when a path it knows carries a value it cannot accept;
+   callers must treat that as "resync from REST" rather than ignore it, or HomeKit drifts from
+   the device with no error ever surfacing. A path the plugin simply doesn't read is different:
+   it lands in `ignored`, leaves `ok` true, and triggers no resync — the cloud bundles fields we
+   don't consume into the same broadcast as ones we do, so treating those as failures would
+   discard every real update. When an `ignored` entry carries an object or array value,
+   `NeoMqtt.handleMessage()` classifies its path via `isConsumedAncestorPath()`: an object at an
+   unread path (e.g. `NV_Schedule.Events`) is ignored quietly at debug level, whereas an entry
+   whose path is a strict ancestor of a consumed path (e.g. `UserAirconSettings.AfterHours`)
+   logs a warning and requests a REST resync so nested consumed values do not stay stale.
+   Verified against live broker traffic; don't "tighten" it back.
 
 3. **Command layer (`src/neo/commands.ts` + `debouncer.ts`).** Three things compose:
    - A keyed trailing-edge debounce (`Debouncer`) — a burst of calls under the same key (a

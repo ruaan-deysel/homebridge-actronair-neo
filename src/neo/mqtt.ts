@@ -9,7 +9,7 @@ import { randomUUID } from 'node:crypto'
 import tls from 'node:tls'
 import mqttPkg from 'mqtt'
 import { SECTIGO_INTERMEDIATE_PEM } from './certs.js'
-import { FullStatusPushSchema, StatusChangeSchema } from './schemas.js'
+import { FullStatusPushSchema, isConsumedAncestorPath, StatusChangeSchema } from './schemas.js'
 
 /** Covered by the broker's `*.actronair.com.au` wildcard cert; the broker itself is dialled by IP. */
 const SNI = 'nimbus.actronair.com.au'
@@ -290,20 +290,24 @@ export class NeoMqtt {
         return
       }
       const result = this.opts.state.applyDelta(parsed.data.event)
-      if (result.ignored.length)
-        this.opts.log.debug(`MQTT status-change ignored unread fields: ${result.ignored.join(', ')}`)
-      // Ignoring a leaf the plugin doesn't read is normal traffic; ignoring an *object* means
-      // a whole subtree went unapplied, which could hide fields we do read nested inside it.
-      // Never seen in captured traffic (deltas are leaf-only), so the contract is unchanged —
-      // but if it ever happens it must not be invisible.
+      // Captured status-change traffic is normally leaf-only. When an ignored entry carries an
+      // object or array value, classify it against the consumed-path allowlist: unread subtrees
+      // (e.g. NV_Schedule.Events) are ignored quietly at debug level, while objects that are
+      // ancestors of consumed leaves (e.g. UserAirconSettings.AfterHours) trigger a REST resync
+      // so those nested values do not stay stale.
       const structural = result.ignored.filter(path => typeof parsed.data.event[path] === 'object' && parsed.data.event[path] !== null)
-      if (structural.length)
-        this.opts.log.warn(`MQTT status-change ignored object-valued fields (${structural.join(', ')}); nested values this plugin reads may be stale until the next poll`)
+      const consumedAncestors = structural.filter(isConsumedAncestorPath)
+      const unread = result.ignored.filter(path => !consumedAncestors.includes(path))
+      if (unread.length)
+        this.opts.log.debug(`MQTT status-change ignored unread fields: ${unread.join(', ')}`)
+      if (consumedAncestors.length)
+        this.opts.log.warn(`MQTT status-change ignored object-valued ancestor fields (${consumedAncestors.join(', ')}); resyncing via REST`)
       if (!result.ok) {
         for (const r of result.rejected)
           this.opts.log.debug(`MQTT status-change rejected ${r.path}: ${r.reason}`)
-        void this.resyncFromRest()
       }
+      if (!result.ok || consumedAncestors.length > 0)
+        void this.resyncFromRest()
     }
     // cmd-response/+/+ is subscribed for completeness (per the observed topic set) but not
     // consumed — command confirmation already happens via CommandQueue's REST re-read.

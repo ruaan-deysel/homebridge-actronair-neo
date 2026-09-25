@@ -5,6 +5,14 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] - 2026-09-25
+
+### Fixed
+
+- **MQTT `status-change` ignored object classification.** Object- and array-valued `status-change` entries are now classified against the consumed-path allowlist via `isConsumedAncestorPath()` (closes #17):
+  - Unread subtrees with no consumed descendants (such as `NV_Schedule.Events`) are ignored quietly at debug level instead of emitting false stale-data warnings.
+  - Object entries whose path is a strict ancestor of consumed leaves (such as `UserAirconSettings.AfterHours`) log a warning and request a coalesced REST resync so nested consumed values do not stay stale, while keeping valid leaf updates applied and notified immediately.
+
 ## [1.3.0] - 2026-09-23
 
 ### Added
