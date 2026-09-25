@@ -310,6 +310,30 @@ export type DeltaValidation
     /** Path is allowlisted but the value doesn't fit its expected type — a real problem. */
     | { ok: false, kind: 'invalid-value', reason: string }
 
+const ALLOWED_DELTA_KEYS = Object.keys(ALLOWED_DELTA_PATHS)
+
+/**
+ * True when `path` (after bracket-index normalization) is a strict ancestor of at least one
+ * consumed path in `ALLOWED_DELTA_PATHS`. That is, an allowlisted path starts with the
+ * normalized `path` immediately followed by `.` or `[`.
+ *
+ * Used by `NeoMqtt.handleMessage()` to distinguish an ignored object-valued entry on an
+ * unread subtree (e.g. `NV_Schedule.Events`, which can be ignored quietly at debug level)
+ * from one that wraps consumed leaves (e.g. `UserAirconSettings.AfterHours`, which requires
+ * a REST resync so those nested leaves do not remain stale).
+ */
+export function isConsumedAncestorPath(path: string): boolean {
+  const normalized = normalizeDeltaPath(path)
+  if (!normalized)
+    return false
+  return ALLOWED_DELTA_KEYS.some((allowed) => {
+    if (!allowed.startsWith(normalized) || allowed.length <= normalized.length)
+      return false
+    const nextChar = allowed[normalized.length]
+    return nextChar === '.' || nextChar === '['
+  })
+}
+
 /**
  * Validate a single status-change path/value pair against the allowlist above. Returns the
  * parsed (possibly coerced) value on success so the caller writes what was actually

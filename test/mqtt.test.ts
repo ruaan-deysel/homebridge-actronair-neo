@@ -453,7 +453,7 @@ describe('neoMqtt', () => {
     mqtt.stop()
   })
 
-  it('warns when a status-change path it ignores carries an object value', async () => {
+  it('ignores an unread object-valued status-change path at debug level without warning or resyncing', async () => {
     const state = new NeoState()
     state.replace(restStatus.lastKnownState)
     const rest = buildRest()
@@ -464,13 +464,120 @@ describe('neoMqtt', () => {
     clients[0].emit('connect')
     await vi.advanceTimersByTimeAsync(0)
     logMocks.warn.mockClear()
+    logMocks.debug.mockClear()
+    rest.getStatus.mockClear()
 
     const base = `actron-cloud/${CONNECTION_DETAILS.UserId}/neo/${SERIAL.toLowerCase()}/mwc`
     clients[0].emit('message', `${base}/status-change`, Buffer.from(JSON.stringify({
       event: { 'type': 'status-change-broadcast', 'SomeUnreadSubtree': { LiveTemp_oC: 21 }, 'UserAirconSettings.isOn': true },
     })))
+    await vi.advanceTimersByTimeAsync(0)
 
-    expect(logMocks.warn).toHaveBeenCalledWith(expect.stringMatching(/object-valued/i))
+    expect(state.get('UserAirconSettings.isOn')).toBe(true)
+    expect(logMocks.warn).not.toHaveBeenCalled()
+    expect(logMocks.debug).toHaveBeenCalledWith(expect.stringContaining('SomeUnreadSubtree'))
+    expect(rest.getStatus).not.toHaveBeenCalled()
+
+    mqtt.stop()
+  })
+
+  it('ignores NV_Schedule.Events array in status-change while applying changed setpoint without warning or resyncing', async () => {
+    const state = new NeoState()
+    state.replace(restStatus.lastKnownState)
+    const rest = buildRest()
+    const { impl, clients } = makeConnectImpl()
+    const mqtt = new NeoMqtt({ rest: rest as never, auth: buildAuth() as never, state, serial: SERIAL, log, connectImpl: impl as never })
+
+    await mqtt.start()
+    clients[0].emit('connect')
+    await vi.advanceTimersByTimeAsync(0)
+    logMocks.warn.mockClear()
+    logMocks.debug.mockClear()
+    rest.getStatus.mockClear()
+
+    const base = `actron-cloud/${CONNECTION_DETAILS.UserId}/neo/${SERIAL.toLowerCase()}/mwc`
+    clients[0].emit('message', `${base}/status-change`, Buffer.from(JSON.stringify({
+      event: {
+        'type': 'status-change-broadcast',
+        'NV_Schedule.Events': [{ Enabled: true }],
+        'UserAirconSettings.TemperatureSetpoint_Cool_oC': 23.5,
+      },
+    })))
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(state.get('UserAirconSettings.TemperatureSetpoint_Cool_oC')).toBe(23.5)
+    expect(state.get('NV_Schedule.Events')).toEqual([])
+    expect(logMocks.warn).not.toHaveBeenCalled()
+    expect(logMocks.debug).toHaveBeenCalledWith(expect.stringContaining('NV_Schedule.Events'))
+    expect(rest.getStatus).not.toHaveBeenCalled()
+
+    mqtt.stop()
+  })
+
+  it('applies valid leaf changes, warns, and requests a REST resync when status-change contains a consumed-ancestor object', async () => {
+    const state = new NeoState()
+    state.replace(restStatus.lastKnownState)
+    const rest = buildRest()
+    const { impl, clients } = makeConnectImpl()
+    const mqtt = new NeoMqtt({ rest: rest as never, auth: buildAuth() as never, state, serial: SERIAL, log, connectImpl: impl as never })
+
+    await mqtt.start()
+    clients[0].emit('connect')
+    await vi.advanceTimersByTimeAsync(0)
+    logMocks.warn.mockClear()
+    rest.getStatus.mockClear()
+
+    const notifiedPaths: string[][] = []
+    state.onChange(paths => notifiedPaths.push([...paths]))
+
+    const base = `actron-cloud/${CONNECTION_DETAILS.UserId}/neo/${SERIAL.toLowerCase()}/mwc`
+    clients[0].emit('message', `${base}/status-change`, Buffer.from(JSON.stringify({
+      event: {
+        'type': 'status-change-broadcast',
+        'UserAirconSettings.AfterHours': { Enabled: true, Duration: 60 },
+        'UserAirconSettings.TemperatureSetpoint_Cool_oC': 24.5,
+      },
+    })))
+
+    // Leaf delta applied and notified synchronously before async resync resolves
+    expect(state.get('UserAirconSettings.TemperatureSetpoint_Cool_oC')).toBe(24.5)
+    expect(notifiedPaths[0]).toContain('UserAirconSettings.TemperatureSetpoint_Cool_oC')
+
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(logMocks.warn).toHaveBeenCalledTimes(1)
+    expect(logMocks.warn).toHaveBeenCalledWith(expect.stringMatching(/UserAirconSettings\.AfterHours.*resync/i))
+    expect(rest.getStatus).toHaveBeenCalledTimes(1)
+
+    mqtt.stop()
+  })
+
+  it('requests only one REST resync when a status-change message contains both an invalid known entry and a consumed-ancestor object', async () => {
+    const state = new NeoState()
+    state.replace(restStatus.lastKnownState)
+    const rest = buildRest()
+    const { impl, clients } = makeConnectImpl()
+    const mqtt = new NeoMqtt({ rest: rest as never, auth: buildAuth() as never, state, serial: SERIAL, log, connectImpl: impl as never })
+
+    await mqtt.start()
+    clients[0].emit('connect')
+    await vi.advanceTimersByTimeAsync(0)
+    logMocks.warn.mockClear()
+    rest.getStatus.mockClear()
+
+    const base = `actron-cloud/${CONNECTION_DETAILS.UserId}/neo/${SERIAL.toLowerCase()}/mwc`
+    clients[0].emit('message', `${base}/status-change`, Buffer.from(JSON.stringify({
+      event: {
+        'type': 'status-change-broadcast',
+        'UserAirconSettings.isOn': 'not-a-boolean',
+        'UserAirconSettings.AfterHours': { Enabled: true, Duration: 60 },
+      },
+    })))
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(logMocks.warn).toHaveBeenCalledTimes(1)
+    expect(logMocks.warn).toHaveBeenCalledWith(expect.stringContaining('UserAirconSettings.AfterHours'))
+    expect(rest.getStatus).toHaveBeenCalledTimes(1)
 
     mqtt.stop()
   })

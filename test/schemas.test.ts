@@ -7,6 +7,7 @@ import {
   ConnectionDetailsSchema,
   DeviceCodeSchema,
   FullStatusPushSchema,
+  isConsumedAncestorPath,
   StatusChangeSchema,
   StatusResponseSchema,
   TokenSchema,
@@ -238,5 +239,26 @@ describe('absent-numeric sentinels on coerced fields', () => {
     }
     const parsed = StatusChangeSchema.parse(directDeltas)
     expect(parsed.event['UserAirconSettings.isOn']).toBe(true)
+  })
+
+  it('classifies strict ancestors of consumed delta paths via isConsumedAncestorPath', () => {
+    // True for ancestors of allowlisted leaves (including bracket-indexed parents)
+    expect(isConsumedAncestorPath('UserAirconSettings.AfterHours')).toBe(true)
+    expect(isConsumedAncestorPath('LiveAircon.OutdoorUnit')).toBe(true)
+    expect(isConsumedAncestorPath('NV_Limits.UserSetpoint_oC')).toBe(true)
+    expect(isConsumedAncestorPath('RemoteZoneInfo[0]')).toBe(true)
+    expect(isConsumedAncestorPath('RemoteZoneInfo')).toBe(true)
+
+    // False for unread subtrees
+    expect(isConsumedAncestorPath('NV_Schedule')).toBe(false)
+    expect(isConsumedAncestorPath('NV_Schedule.Events')).toBe(false)
+    expect(isConsumedAncestorPath('SomeUnreadSubtree')).toBe(false)
+
+    // False for an allowlisted leaf itself (not a strict ancestor)
+    expect(isConsumedAncestorPath('UserAirconSettings.EnabledZones')).toBe(false)
+
+    // False for a partial-segment prefix
+    expect(isConsumedAncestorPath('UserAirconSettings.After')).toBe(false)
+    expect(isConsumedAncestorPath('')).toBe(false)
   })
 })
